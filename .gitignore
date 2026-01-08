@@ -1,0 +1,40 @@
+# Dependencies
+node_modules/
+venv/
+env/
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Data files (optional - décommenter si nécessaire)
+# *.csv
+# *.xlsx
+# data/
+
+# Secrets
+*.pem
+*.key
+secrets/
+credentials/
+
+# Claude
+.claude/
