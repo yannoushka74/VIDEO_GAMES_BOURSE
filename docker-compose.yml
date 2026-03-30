@@ -1,0 +1,16 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: vgb_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: videogames_bourse
+      POSTGRES_USER: vgb_user
+      POSTGRES_PASSWORD: vgb_password
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:

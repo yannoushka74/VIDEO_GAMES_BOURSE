@@ -1,0 +1,130 @@
+"""
+Scrape les annonces eBay en cours pour les jeux rétro et les stocke dans Listing.
+Usage:
+  python manage.py scrape_ebay_listings                          # toutes les consoles, 50 jeux
+  python manage.py scrape_ebay_listings --platform snes          # SNES uniquement
+  python manage.py scrape_ebay_listings --platform snes,nes      # SNES + NES
+  python manage.py scrape_ebay_listings --all                    # tous les jeux
+  python manage.py scrape_ebay_listings --game "Chrono Trigger"  # un jeu
+"""
+
+import os
+import signal
+import time
+
+os.environ["DJANGO_ALLOW_ASYNC_UNSAFE"] = "true"
+
+from django.core.management.base import BaseCommand
+
+from scrapers.ebay import EbayScraper, search_ebay, detect_region
+from games.models import Game, Listing
+
+RETRO_SLUGS = {"neo", "nes", "snes", "gba", "saturn", "n64"}
+
+
+class Command(BaseCommand):
+    help = "Scrape les annonces eBay en cours pour les jeux rétro"
+
+    def add_arguments(self, parser):
+        parser.add_argument("--platform", type=str, help="Console(s) séparées par virgule")
+        parser.add_argument("--game", type=str, help="Recherche par titre")
+        parser.add_argument("--limit", type=int, default=50, help="Nombre de jeux (défaut: 50)")
+        parser.add_argument("--all", action="store_true", help="Tous les jeux")
+        parser.add_argument("--clear", action="store_true", help="Supprimer les anciennes annonces eBay")
+        parser.add_argument("--delay", type=float, default=0.5, help="Délai entre requêtes (défaut: 0.5)")
+
+    def handle(self, *args, **options):
+        if options["clear"]:
+            deleted = Listing.objects.filter(source=Listing.Source.EBAY).delete()
+            self.stdout.write(f"Supprimé {deleted[0]} anciennes annonces eBay")
+
+        # Charger le scraper (pour les clés .env)
+        scraper = EbayScraper(delay=options["delay"])
+
+        # Sélection des jeux
+        base_qs = Game.objects.filter(machines__slug__in=RETRO_SLUGS).distinct()
+
+        if options["platform"]:
+            slugs = [p.strip().lower() for p in options["platform"].split(",")]
+            base_qs = base_qs.filter(machines__slug__in=slugs).distinct()
+            self.stdout.write(f"Plateforme(s) : {', '.join(slugs)} ({base_qs.count()} jeux)")
+
+        if options["game"]:
+            games = list(base_qs.filter(title__icontains=options["game"]))
+            self.stdout.write(f"Recherche : {len(games)} jeux pour '{options['game']}'")
+        elif options["all"]:
+            games = list(base_qs)
+            self.stdout.write(f"Mode ALL : {len(games)} jeux")
+        else:
+            games = list(base_qs[:options["limit"]])
+            self.stdout.write(f"Jeux : {len(games)}")
+
+        if not games:
+            self.stdout.write(self.style.WARNING("Aucun jeu."))
+            return
+
+        total = len(games)
+        delay = options["delay"]
+        total_listings = 0
+        stopped = False
+
+        def signal_handler(sig, frame):
+            nonlocal stopped
+            stopped = True
+            self.stdout.write(self.style.WARNING("\n\nArrêt demandé..."))
+
+        signal.signal(signal.SIGINT, signal_handler)
+
+        self.stdout.write(f"\nScraping eBay ({total} jeux, délai: {delay}s)...\n")
+
+        for i, game in enumerate(games, 1):
+            if stopped:
+                break
+
+            # Trouver la console du jeu
+            platform_slug = ""
+            for m in game.machines.all():
+                if m.slug in RETRO_SLUGS:
+                    platform_slug = m.slug
+                    break
+
+            self.stdout.write(f"  [{i}/{total}] {game.title[:50]} ({platform_slug})...", ending=" ")
+
+            time.sleep(delay)
+            items = search_ebay(game.title, platform_slug, limit=10, pal_only=False)
+
+            if not items:
+                self.stdout.write(self.style.WARNING("0 annonces"))
+                continue
+
+            count = 0
+            for item in items:
+                region = detect_region(item["title"])
+                Listing.objects.create(
+                    game=game,
+                    source=Listing.Source.EBAY,
+                    platform_slug=platform_slug,
+                    title=item["title"],
+                    listing_url=item["listing_url"],
+                    image_url=item.get("image_url", ""),
+                    current_price=item["price"],
+                    buy_now_price=None,
+                    currency=item["currency"],
+                    bid_count=item.get("bid_count", 0),
+                    condition=item.get("condition", ""),
+                    region=region,
+                )
+                count += 1
+
+            regions = [detect_region(i["title"]) for i in items]
+            pal = regions.count("PAL")
+            ntsc = regions.count("NTSC")
+            jp = regions.count("JP")
+            self.stdout.write(self.style.SUCCESS(
+                f"{count} annonces (PAL:{pal} NTSC:{ntsc} JP:{jp})"
+            ))
+            total_listings += count
+
+        self.stdout.write(
+            self.style.SUCCESS(f"\nTerminé ! {total_listings} annonces eBay importées.")
+        )

@@ -25,10 +25,11 @@ Thumbs.db
 *.log
 logs/
 
-# Data files (optional - décommenter si nécessaire)
-# *.csv
-# *.xlsx
-# data/
+# Data files (scraped data, too large for git)
+data/
+
+# Botasaurus output
+output/
 
 # Secrets
 *.pem

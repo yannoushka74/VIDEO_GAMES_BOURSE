@@ -1,0 +1,156 @@
+from django.db import models
+
+
+class Machine(models.Model):
+    """Plateforme de jeu (PC, PS5, Switch, etc.)."""
+
+    jvc_id = models.IntegerField(unique=True, help_text="ID jeuxvideo.com")
+    name = models.CharField(max_length=100)
+    slug = models.SlugField(max_length=100, unique=True)
+
+    class Meta:
+        ordering = ["name"]
+
+    def __str__(self):
+        return self.name
+
+
+class Genre(models.Model):
+    """Genre de jeu (RPG, FPS, Action, etc.)."""
+
+    jvc_id = models.IntegerField(unique=True, help_text="ID jeuxvideo.com")
+    name = models.CharField(max_length=100)
+    slug = models.SlugField(max_length=100, unique=True)
+
+    class Meta:
+        ordering = ["name"]
+
+    def __str__(self):
+        return self.name
+
+
+class Game(models.Model):
+    """Jeu vidéo."""
+
+    class GameType(models.IntegerChoices):
+        SERIE = 1, "Série"
+        COMPILATION = 2, "Compilation"
+        MASTERFICHE = 4, "Masterfiche"
+        JEU = 9, "Jeu"
+        FICHE_GENERIQUE = 49, "Fiche de jeu générique"
+
+    jvc_id = models.IntegerField(unique=True, help_text="ID jeuxvideo.com")
+    title = models.CharField(max_length=500, db_index=True)
+    game_type = models.IntegerField(choices=GameType.choices, default=GameType.JEU)
+    release_date = models.CharField(max_length=100, blank=True)
+    cover_url = models.URLField(max_length=500, blank=True)
+
+    machines = models.ManyToManyField(Machine, related_name="games", blank=True)
+    genres = models.ManyToManyField(Genre, related_name="games", blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["title"]
+
+    def __str__(self):
+        return self.title
+
+
+class Price(models.Model):
+    """Prix d'un jeu vidéo scraped depuis une source externe."""
+
+    class Source(models.TextChoices):
+        AMAZON = "amazon", "Amazon"
+        GALAXUS = "galaxus", "Galaxus"
+        PRICECHARTING = "pricecharting", "PriceCharting"
+        EBAY = "ebay", "eBay"
+        FNAC = "fnac", "Fnac"
+        MICROMANIA = "micromania", "Micromania"
+        STEAM = "steam", "Steam"
+
+    game = models.ForeignKey(Game, on_delete=models.CASCADE, related_name="prices")
+    source = models.CharField(max_length=20, choices=Source.choices)
+
+    # Prix principal (loose pour PriceCharting, prix actuel pour Amazon/Galaxus)
+    price = models.DecimalField(max_digits=10, decimal_places=2)
+    old_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    discount_percent = models.IntegerField(null=True, blank=True)
+    currency = models.CharField(max_length=3, default="EUR")
+
+    # Prix collector (PriceCharting)
+    cib_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, help_text="Complet en boîte")
+    new_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, help_text="Neuf scellé")
+    graded_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, help_text="Gradé WATA/VGA")
+    box_only_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, help_text="Boîte seule")
+    manual_only_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, help_text="Manuel seul")
+
+    # Infos produit
+    product_url = models.URLField(max_length=500, blank=True)
+    product_title = models.CharField(max_length=500, blank=True)
+    asin = models.CharField(max_length=20, blank=True, help_text="Identifiant Amazon")
+    image_url = models.URLField(max_length=500, blank=True)
+
+    # Avis
+    rating = models.DecimalField(max_digits=2, decimal_places=1, null=True, blank=True)
+    review_count = models.IntegerField(null=True, blank=True)
+
+    # Disponibilité
+    availability = models.CharField(max_length=200, blank=True)
+
+    # Catégorie Amazon (pour valider que c'est bien un jeu)
+    category = models.CharField(max_length=300, blank=True)
+
+    scraped_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-scraped_at"]
+        indexes = [
+            models.Index(fields=["game", "source", "-scraped_at"]),
+        ]
+
+    def __str__(self):
+        return f"{self.game.title} - {self.price} {self.currency} ({self.source})"
+
+
+class Listing(models.Model):
+    """Enchère ou annonce en cours sur une marketplace (Ricardo, eBay, etc.)."""
+
+    class Source(models.TextChoices):
+        RICARDO = "ricardo", "Ricardo"
+        EBAY = "ebay", "eBay"
+
+    game = models.ForeignKey(Game, on_delete=models.CASCADE, related_name="listings", null=True, blank=True)
+    source = models.CharField(max_length=20, choices=Source.choices)
+    platform_slug = models.SlugField(max_length=20, help_text="Console: snes, nes, n64, etc.")
+
+    # Annonce
+    title = models.CharField(max_length=500)
+    listing_url = models.URLField(max_length=500)
+    image_url = models.URLField(max_length=500, blank=True)
+
+    # Prix
+    current_price = models.DecimalField(max_digits=10, decimal_places=2)
+    buy_now_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    currency = models.CharField(max_length=3, default="CHF")
+
+    # Enchère
+    bid_count = models.IntegerField(default=0)
+    ends_at = models.DateTimeField(null=True, blank=True)
+
+    # Condition & Région
+    condition = models.CharField(max_length=100, blank=True)
+    region = models.CharField(max_length=10, blank=True, help_text="PAL, NTSC, JP")
+
+    scraped_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["ends_at"]
+        indexes = [
+            models.Index(fields=["source", "platform_slug"]),
+            models.Index(fields=["game", "source"]),
+        ]
+
+    def __str__(self):
+        return f"{self.title[:50]} - {self.current_price} {self.currency} ({self.source})"
