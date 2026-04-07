@@ -120,6 +120,7 @@ class Listing(models.Model):
     class Source(models.TextChoices):
         RICARDO = "ricardo", "Ricardo"
         EBAY = "ebay", "eBay"
+        LEBONCOIN = "leboncoin", "LeBonCoin"
 
     game = models.ForeignKey(Game, on_delete=models.CASCADE, related_name="listings", null=True, blank=True)
     source = models.CharField(max_length=20, choices=Source.choices)

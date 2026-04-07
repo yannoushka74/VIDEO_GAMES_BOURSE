@@ -31,6 +31,9 @@ data/
 # Botasaurus output
 output/
 
+# Botasaurus browser profiles (cookies, cache Chrome)
+profiles/
+
 # Secrets
 *.pem
 *.key
