@@ -26,11 +26,18 @@ def _parse_usd(text: str) -> float | None:
         return None
 
 
-# Consoles PAL sur PriceCharting
+# Consoles PAL sur PriceCharting (seules ces valeurs sont acceptées)
 PAL_CONSOLE_NAMES = {
     "pal super nintendo", "pal nes", "pal nintendo 64",
     "pal gameboy advance", "pal sega saturn", "pal neo geo",
     "pal gameboy", "pal sega genesis",
+}
+
+# Mots-clés qui indiquent que ce n'est PAS un jeu vidéo
+EXCLUDED_KEYWORDS = {
+    "card", "cards", "trading", "tcg", "booster", "pokemon card",
+    "magic", "yugioh", "yu-gi-oh", "figurine", "amiibo", "guide",
+    "strategy guide", "manga", "comic", "soundtrack", "ost",
 }
 
 
@@ -62,7 +69,12 @@ def _scrape_logic(req: Request, game_title: str):
             href = link.get("href", "")
             url = f"https://www.pricecharting.com{href}" if href.startswith("/") else href
             title = link.get_text(strip=True)
-            is_pal = console_name in PAL_CONSOLE_NAMES or "pal" in console_name
+            # Exclure les non-jeux (cartes, figurines, guides, etc.)
+            title_lower = title.lower()
+            console_lower = console_name.lower()
+            if any(kw in title_lower or kw in console_lower for kw in EXCLUDED_KEYWORDS):
+                continue
+            is_pal = console_name in PAL_CONSOLE_NAMES
             candidates.append({
                 "url": url,
                 "title": title,
@@ -73,9 +85,11 @@ def _scrape_logic(req: Request, game_title: str):
         if not candidates:
             return None
 
-        # Priorité : PAL d'abord, sinon premier résultat
+        # PAL uniquement
         pal_candidates = [c for c in candidates if c["is_pal"]]
-        best = pal_candidates[0] if pal_candidates else candidates[0]
+        if not pal_candidates:
+            return None
+        best = pal_candidates[0]
         product_url = best["url"]
         product_title = best["title"]
 
