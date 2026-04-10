@@ -63,6 +63,26 @@ def _is_non_pal(title: str) -> bool:
     return False
 
 
+def detect_region(title: str) -> str:
+    """Détecte la région à partir du titre (PAL/NTSC/JP/unknown)."""
+    low = title.lower()
+    # JP / Famicom
+    if any(p in low for p in ("super famicom", "famicom")):
+        return "JP"
+    if NON_PAL_TOKEN_RE.search(low):
+        # Distinguer JP vs NTSC-US
+        jp_words = {"jp", "jap", "japan", "japon", "japonais", "japonaise", "japanese"}
+        for w in jp_words:
+            if re.search(rf"\b{w}\b", low):
+                return "JP"
+        return "NTSC"
+    # PAL explicite
+    if re.search(r"\bpal\b|\beur\b|\beurope\b|\beuropean\b", low):
+        return "PAL"
+    # Ricardo est suisse → PAL par défaut si pas d'indication contraire
+    return "PAL"
+
+
 def _title_from_slug(href: str) -> str:
     """Extrait un titre lisible du slug d'URL /fr/a/{slug}-{id}/."""
     m = re.search(r"/fr/a/(.+?)-?\d+/?$", href)
@@ -98,9 +118,8 @@ def _extract_listing_from_card(link_el) -> dict | None:
     if not title:
         return None
 
-    # Filtre PAL
-    if _is_non_pal(title):
-        return None
+    # Détection de région (PAL/NTSC/JP) — on ne rejette plus, on tag
+    region = detect_region(title)
 
     # Image : prendre la première img non-badge
     image_url = ""
@@ -161,7 +180,7 @@ def _extract_listing_from_card(link_el) -> dict | None:
         "current_price": current_price,
         "buy_now_price": buy_now_price,
         "bid_count": bid_count,
-        "region": "PAL",
+        "region": region,
     }
 
 
