@@ -16,7 +16,20 @@ Le projet tourne sur un cluster K3s local exposé via Tailscale.
 - **DB creds** : user `vgb_user`, password `vgb_password`, db `videogames_bourse`
 - **Manifests K8s** : `k8s/{namespace,postgres,backend,frontend,ingress}.yaml`
 
-### Rebuild & redeploy
+### CI/CD (GitHub Actions)
+
+Le déploiement est automatisé via **GitHub Actions** sur un **self-hosted runner** (`minix-runner`) installé sur la machine K3s.
+
+| Workflow | Trigger | Actions | Durée |
+|---|---|---|---|
+| `backend.yml` | push `backend/` sur main | Build `vgb-backend` + `vgb-scraper` → import k3s → migrate → rollout restart | ~2 min |
+| `frontend.yml` | push `frontend/` sur main | Build `vgb-frontend` → import k3s → rollout restart | ~40s |
+
+**Flow** : `git push origin main` → GitHub Actions → build → deploy → live
+
+Le runner est un service systemd (`actions.runner.yannoushka74-VIDEO_GAMES_BOURSE.minix-runner.service`) qui démarre au boot.
+
+### Rebuild manuel (si besoin)
 ```bash
 # Backend
 echo 'Totoro12345!' | sudo -S docker build -t vgb-backend:latest backend/
