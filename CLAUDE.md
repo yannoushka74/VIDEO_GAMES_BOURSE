@@ -2,6 +2,66 @@
 
 Plateforme web de suivi des cotes de jeux vidéo rétro collector. Focus sur 6 consoles : Neo Geo, NES, SNES, GBA, Saturn, N64 (~3 282 jeux).
 
+## Déploiement production (K3s)
+
+Le projet tourne sur un cluster K3s local exposé via Tailscale.
+
+| Service | URL Tailscale |
+|---|---|
+| Frontend / API | `https://videogames.tail430f32.ts.net` |
+| PostgreSQL (LB) | `vgb-postgres.tail430f32.ts.net:5432` |
+
+- **Namespace** : `videogames`
+- **Images** : `vgb-backend:latest`, `vgb-frontend:latest`, `vgb-scraper:latest` (imagePullPolicy: `Never`)
+- **DB creds** : user `vgb_user`, password `vgb_password`, db `videogames_bourse`
+- **Manifests K8s** : `k8s/{namespace,postgres,backend,frontend,ingress}.yaml`
+
+### Rebuild & redeploy
+```bash
+# Backend
+echo 'Totoro12345!' | sudo -S docker build -t vgb-backend:latest backend/
+echo 'Totoro12345!' | sudo -S sh -c 'docker save vgb-backend:latest | k3s ctr images import -'
+kubectl rollout restart deployment vgb-backend -n videogames
+
+# Frontend
+echo 'Totoro12345!' | sudo -S docker build -t vgb-frontend:latest frontend/
+echo 'Totoro12345!' | sudo -S sh -c 'docker save vgb-frontend:latest | k3s ctr images import -'
+kubectl rollout restart deployment vgb-frontend -n videogames
+
+# Scraper (Botasaurus + Chromium)
+echo 'Totoro12345!' | sudo -S docker build -t vgb-scraper:latest -f backend/Dockerfile.scraper backend/
+echo 'Totoro12345!' | sudo -S sh -c 'docker save vgb-scraper:latest | k3s ctr images import -'
+```
+
+### Query DB rapide
+```bash
+kubectl exec -n videogames deployment/vgb-backend -- python -c "
+import psycopg2
+conn = psycopg2.connect(host='vgb-postgres.videogames.svc.cluster.local',
+                       dbname='videogames_bourse', user='vgb_user', password='vgb_password')
+cur = conn.cursor()
+cur.execute('SELECT COUNT(*) FROM games_game')
+print(cur.fetchone())
+"
+```
+
+## Pièges connus / Gotchas
+
+- **Console matching** : tout match prix doit être strictement filtré sur la console du jeu d'origine. Sinon NES Shinobi → Saturn Shinobi X (bug fixé 2026-04-09, 188 mauvais prix supprimés).
+- **JVC IDs consoles** : seuls 340, 360, 430, 370, 210, 420 sont les vraies rétro. Les IDs 40, 150, 160, 170, 180, 220 sont d'autres consoles (WiiU, etc.).
+- **PriceCharting PAL only** : pas de fallback NTSC. Conséquence : certains jeux NES/GBA sans fiche `PAL *` sur PriceCharting (ex: 1943, ActRaiser GBA, DKC2/3 GBA) restent sans cote — c'est volontaire.
+- **Titres FR vs EN** : JVC en français, PriceCharting en anglais. Utiliser `title_en` (rempli par DAG IGDB) pour la recherche quand dispo.
+- **`title_en` est NOT NULL** : utiliser `''` pour vider, pas `NULL`.
+- **Scrapers Airflow** : le code de scraping productif est dans le repo `airflow-local-setup` (DAGs), PAS dans ce repo. Les `*_scraper.py` ici sont les versions originales en management commands.
+- **Frontend `m.slug`** : le filtre machine doit utiliser `m.slug` pas `m.jvc_id`.
+- **Filtre PAL par défaut** : `_retro_games_qs()` exclut par défaut `pal_status='not_pal'` ET ne garde que les jeux ayant une preuve PAL (`pal_status='pal'` OR cote PriceCharting OR annonce Ricardo). `?include_unverified=true` désactive le filtre. Sur la page détail (`retrieve`), le filtre est bypassé pour autoriser les liens directs.
+- **Ricardo URL** : utiliser `%20` (pas `+`) pour encoder les espaces dans les query Ricardo, sinon résultats vides.
+
+## Dev local (legacy)
+
+Le setup ci-dessous est l'ancien dev local docker-compose. **En prod c'est K3s (voir plus haut).**
+
+
 ## Stack technique
 
 - **Backend** : Django 4.2 + Django REST Framework
@@ -112,22 +172,57 @@ python manage.py scrape_ricardo  # toutes les consoles
 
 | URL | Description |
 |-----|-------------|
-| `GET /api/games/` | Liste paginée (filtrée sur 6 consoles rétro) |
+| `GET /api/games/` | Liste paginée — filtrée PAL-vérifié par défaut |
+| `GET /api/games/?include_unverified=true` | Tous les jeux (y compris non vérifiés PAL) |
 | `GET /api/games/?search=chrono` | Recherche par titre |
 | `GET /api/games/?machine=snes` | Filtrer par console (slug) |
-| `GET /api/games/:id/` | Détail + prix + enchères |
+| `GET /api/games/?ordering=-latest_loose_price` | Tri par prix (loose PriceCharting) |
+| `GET /api/games/?price_min=50&price_max=300` | Filtre par fourchette de prix |
+| `GET /api/games/?has_price=true` | Uniquement jeux avec cote PriceCharting |
+| `GET /api/games/:id/` | Détail + prix + enchères (bypass filtre PAL) |
+| `GET /api/games/:id/price-history/` | Historique chronologique des cotes scrapées |
+| `GET /api/opportunities/?min_discount=20&platform=snes` | Annonces Ricardo sous la cote PriceCharting |
 | `GET /api/machines/` | 6 consoles rétro |
 | `GET /api/genres/` | Genres |
-| `GET /api/stats/` | Compteurs |
+| `GET /api/stats/` | Compteurs (`games_count` PAL vérifié + `games_count_total`) |
 | `GET /api/autocomplete/?q=chr` | Autocomplétion recherche |
+| `GET /api/top/?platform=snes` | Top 200 jeux les plus chers |
 
 ## Modèles Django
 
-- **Game** : jvc_id, title, game_type, release_date, cover_url + M2M Machine/Genre
+- **Game** : jvc_id, title, **title_en**, **pal_status** (`unknown`/`pal`/`not_pal`, populé via DAG `igdb_pal_status`), game_type, release_date, cover_url + M2M Machine/Genre
 - **Machine** : jvc_id, name, slug
 - **Genre** : jvc_id, name, slug
-- **Price** : game (FK), source, price, cib_price, new_price, graded_price, box_only_price, manual_only_price, old_price, discount_percent, rating, review_count, asin, availability, category
-- **Listing** : game (FK nullable), source, title, listing_url, current_price, buy_now_price, bid_count, ends_at, platform_slug
+- **Price** : game (FK), source, price, cib_price, new_price, graded_price, box_only_price, manual_only_price, old_price, discount_percent, rating, review_count, asin, availability, category, scraped_at (mode append-only → historique conservé)
+- **Listing** : game (FK nullable), source, title, listing_url, current_price, buy_now_price, bid_count, ends_at, region, platform_slug
+
+## Module matching annonces (`backend/scrapers/matching.py`)
+
+Module commun utilisé par `scrape_ricardo` (et par `rematch_listings`) pour rattacher une annonce marketplace à un jeu en base. Stratégie :
+
+- **Normalisation Unicode** (sans accents, ponctuation→espace, lowercase)
+- **Extraction des numéros** (arabes 1-9999 + romains II-X) avec **vérification stricte** : un listing avec "3" ne peut PAS matcher un jeu sans "3" (et inversement)
+- **`PLATFORM_NOISE`** : ~80 mots filtrés (consoles, état, packaging, langues, mots de liaison FR/DE/EN/IT)
+- **`TOKEN_TRANSLATIONS`** : ~60 entrées DE/IT/FR ↔ EN bidirectionnel (Pokémon couleurs, Harry Potter, etc.)
+- **`is_likely_accessory()`** : détecte les bundles/console seule/manettes/câbles via `ACCESSORY_TOKENS`, `BUNDLE_PHRASES` et `BUNDLE_QUANTITY_RE` (regex `\d+ games?/spiele/controllers?`)
+- **Score combiné** rapidfuzz : `0.5×token_set_ratio + 0.3×token_sort_ratio + 0.2×partial_ratio`
+- **Comparaison** sur `title` ET `title_en` (le meilleur des deux)
+- **Seuil** par défaut : **70/100**
+
+Résultat actuel sur Ricardo : **72% des listings non-accessoires matchés** (vs 51% avec l'ancien matching set-intersection).
+
+## Commande management `rematch_listings`
+
+Retraite le matching annonce → jeu sur les Listings existants sans re-scraper.
+
+```bash
+python manage.py rematch_listings --source ricardo            # apply
+python manage.py rematch_listings --dry-run                   # preview
+python manage.py rematch_listings --threshold 65              # plus permissif
+python manage.py rematch_listings --platform snes             # une seule console
+```
+
+Affiche un bilan : matchés AVANT/APRÈS, conservés, nouveaux matchs, matchs changés/perdus, exclusion accessoires.
 
 ## Conventions
 

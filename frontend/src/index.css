@@ -588,6 +588,13 @@ a:hover {
 .game-detail__title {
   font-size: 2rem;
   font-weight: 700;
+  margin-bottom: 0.25rem;
+}
+
+.game-detail__title-en {
+  font-size: 1rem;
+  color: var(--text-secondary);
+  font-style: italic;
   margin-bottom: 1rem;
 }
 

@@ -1,203 +1,302 @@
 """
 Scraper Ricardo.ch pour les enchères de jeux rétro.
-Parcourt les résultats de recherche par console et extrait les annonces.
+
+Stratégie :
+- `driver.google_get` pour bypasser Cloudflare sur la page de résultats.
+- Extraction directe depuis la liste (pas de visite page détail → Cloudflare bloque
+  les navigations internes via `driver.get`).
+- URL de recherche encodée avec %20 (Ricardo traite `+` comme caractère littéral).
+- Filtrage PAL strict sur le titre : rejette JP/Japan/Famicom/US/USA/NTSC.
+- Titre lu depuis l'attribut `alt` de l'image, sinon fallback slug URL.
 """
 
 from __future__ import annotations
 
-import json
 import logging
 import re
+from urllib.parse import unquote
 
 from botasaurus.browser import browser, Driver
 from botasaurus.soupify import soupify
 
 logger = logging.getLogger(__name__)
 
-# Recherches Ricardo par plateforme
+# Recherches Ricardo par plateforme (espaces URL-encodés %20, PAS +)
 CONSOLE_SEARCHES = {
-    "snes": "super+nintendo+jeu",
-    "nes": "nintendo+NES+jeu",
-    "n64": "nintendo+64+jeu",
-    "neo": "neo+geo+jeu",
-    "gba": "game+boy+advance+jeu",
-    "saturn": "sega+saturn+jeu",
+    "snes": "super%20nintendo%20jeu",
+    "nes": "nintendo%20nes%20jeu",
+    "n64": "nintendo%2064%20jeu",
+    "neo": "neo%20geo%20jeu",
+    "gba": "game%20boy%20advance%20jeu",
+    "saturn": "sega%20saturn%20jeu",
 }
 
+# Filtre PAL Europe : rejette tout titre mentionnant JP/Japan/Famicom/US/USA/NTSC.
+NON_PAL_TOKEN_RE = re.compile(
+    r"\b("
+    r"ntsc|ntscu|ntscj|"
+    r"jp|jap|japan|japon|japonais|japonaise|japanese|"
+    r"famicom|"
+    r"us|usa|american|americain|américain|"
+    r"asia|asian|asiatique|chinese|korean|coréen|coreen"
+    r")\b",
+    re.IGNORECASE,
+)
+NON_PAL_PHRASES = (
+    "super famicom",
+    "import us", "import usa", "import japan", "import jp",
+    "version us", "version usa", "version japan", "version jp",
+    "us version", "usa version", "japan version", "japanese version",
+)
 
-def _extract_listing_from_page(driver: Driver, url: str) -> dict | None:
-    """Extrait les données d'une annonce Ricardo."""
+# Badges / alt d'images à ignorer (ne sont pas des titres)
+BADGE_ALTS = {"boost", "highlight", "premium", "top", ""}
+
+
+def _is_non_pal(title: str) -> bool:
+    """True si le titre indique explicitement un import non-PAL (JP/US)."""
+    low = title.lower()
+    if any(p in low for p in NON_PAL_PHRASES):
+        return True
+    if NON_PAL_TOKEN_RE.search(low):
+        return True
+    return False
+
+
+def _title_from_slug(href: str) -> str:
+    """Extrait un titre lisible du slug d'URL /fr/a/{slug}-{id}/."""
+    m = re.search(r"/fr/a/(.+?)-?\d+/?$", href)
+    if not m:
+        return ""
+    slug = m.group(1)
+    # URL-decode (emojis, accents encodés)
     try:
-        driver.get(url)
-        driver.short_random_sleep()
-        driver.sleep(3)
+        slug = unquote(slug)
+    except Exception:
+        pass
+    # Remplacer tirets par espaces, virer emojis / caractères non-ASCII restants
+    title = slug.replace("-", " ")
+    # Supprimer emojis et caractères spéciaux (garder lettres/chiffres/espaces/ponctuation de base)
+    title = re.sub(r"[^\w\s\-'.:&+()]", " ", title, flags=re.UNICODE)
+    title = re.sub(r"\s+", " ", title).strip()
+    return title
 
-        soup = soupify(driver.page_html)
-        text = soup.get_text(" ", strip=True)
 
-        # Titre
-        h1 = soup.select_one("h1")
-        title = h1.text.strip() if h1 else ""
-        if not title:
-            return None
-
-        # Prix depuis le texte
-        chf_prices = re.findall(r"CHF\s*([\d']+[.,]?\d*)", text)
-        current_price = None
-        buy_now_price = None
-
-        if chf_prices:
-            # Premier prix = enchère actuelle ou prix de départ
-            try:
-                current_price = float(chf_prices[0].replace("'", "").replace(",", "."))
-            except ValueError:
-                pass
-
-        # Achat direct
-        achat_match = re.search(r"Achat\s*direct[^C]*CHF\s*([\d']+[.,]?\d*)", text, re.IGNORECASE)
-        if not achat_match:
-            achat_match = re.search(r"([\d']+[.,]?\d*)\s*Achat\s*direct", text, re.IGNORECASE)
-        if achat_match:
-            try:
-                buy_now_price = float(achat_match.group(1).replace("'", "").replace(",", "."))
-            except ValueError:
-                pass
-
-        # Nombre d'enchères
-        bid_match = re.search(r"Enchères\s*\((\d+)\)", text, re.IGNORECASE)
-        if not bid_match:
-            bid_match = re.search(r"(\d+)\s*enchère", text, re.IGNORECASE)
-        bid_count = int(bid_match.group(1)) if bid_match else 0
-
-        # Date de fin
-        ends_at = None
-        end_match = re.search(
-            r"(\w+ \d+ \w+ \d{4})[^0-9]*(\d{2}:\d{2})",
-            text,
-        )
-        if end_match:
-            from django.utils.dateparse import parse_datetime
-            import locale
-            date_str = f"{end_match.group(1)} {end_match.group(2)}"
-            ends_at = date_str  # On stocke en texte, le parsing sera fait plus tard
-
-        # Image
-        img = soup.select_one('img[src*="ricardo"], img[src*="images"]')
-        image_url = ""
-        if img:
-            src = img.get("src", "")
-            if "ricardo" in src or "images" in src:
-                image_url = src
-
-        if current_price is None:
-            return None
-
-        return {
-            "title": title,
-            "listing_url": url,
-            "image_url": image_url,
-            "current_price": current_price,
-            "buy_now_price": buy_now_price,
-            "bid_count": bid_count,
-            "ends_at_text": ends_at,
-        }
-
-    except Exception as e:
-        logger.warning("Erreur scraping Ricardo '%s': %s", url, e)
+def _extract_listing_from_card(link_el) -> dict | None:
+    """Extrait une annonce depuis son élément <a> de la liste de résultats."""
+    href = link_el.get("href", "")
+    if not href or "/fr/a/" not in href:
         return None
 
+    # Normaliser URL
+    listing_url = href.split("?")[0]
+    if listing_url.startswith("/"):
+        listing_url = f"https://www.ricardo.ch{listing_url}"
 
-def _collect_listing_urls(driver: Driver, search_url: str) -> list[str]:
-    """Parcourt toutes les pages de résultats et collecte les URLs d'annonces."""
-    all_links = []
-    seen = set()
-    page = 1
+    # Titre : source unique = slug URL (déterministe, les alt img sont des badges)
+    title = _title_from_slug(href)
+    if not title:
+        return None
 
-    driver.google_get(search_url)
-    driver.short_random_sleep()
-    driver.sleep(5)
+    # Filtre PAL
+    if _is_non_pal(title):
+        return None
 
-    while True:
-        soup = soupify(driver.page_html)
-
-        # Extraire les URLs des annonces sur cette page
-        page_links = []
-        for a in soup.select("a[href]"):
-            href = a.get("href", "")
-            if "/fr/a/" in href:
-                full_url = f"https://www.ricardo.ch{href}" if href.startswith("/") else href
-                # Normaliser l'URL (enlever les query params)
-                clean_url = full_url.split("?")[0]
-                if clean_url not in seen:
-                    seen.add(clean_url)
-                    page_links.append(full_url)
-
-        all_links.extend(page_links)
-        logger.info("Ricardo page %d: %d nouvelles annonces (total: %d)", page, len(page_links), len(all_links))
-
-        if not page_links:
+    # Image : prendre la première img non-badge
+    image_url = ""
+    for img in link_el.select("img"):
+        alt = (img.get("alt") or "").strip().lower()
+        if alt in BADGE_ALTS:
+            continue
+        src = img.get("src") or img.get("data-src") or ""
+        if src and src.startswith("http"):
+            image_url = src
             break
 
-        # Chercher le bouton "page suivante"
-        next_btn = None
-        for a in soup.select("a[href]"):
-            href = a.get("href", "")
-            text = a.get_text(strip=True).lower()
-            # Bouton suivant: soit aria-label, soit texte, soit icône >
-            aria = a.get("aria-label", "").lower()
-            if "next" in aria or "suivant" in aria or "nächste" in aria:
-                next_btn = href
-                break
-            if text in (">", "›", "suivant", "next", "weiter"):
-                next_btn = href
-                break
+    # Texte du link : contient "titre prix (N enchère) prix_achat_direct date"
+    text = link_el.get_text(" ", strip=True)
+    # Enlever le titre du début pour parser les prix
+    prices = re.findall(r"(\d+[.,]?\d*)\s*(?=\(|Achat|enchère|$)", text)
+    # Fallback plus simple : tous les nombres décimaux
+    all_numbers = [float(x.replace(",", ".").replace("'", "")) for x in re.findall(r"\b(\d+(?:[.,]\d{1,2})?)\b", text)]
 
-        if not next_btn:
-            # Essayer de trouver le lien de page suivante par numéro
-            current_page_param = f"page={page}"
-            next_page_param = f"page={page + 1}"
-            for a in soup.select("a[href]"):
-                href = a.get("href", "")
-                if next_page_param in href:
-                    next_btn = href
-                    break
+    # Nombre d'enchères
+    bid_match = re.search(r"\((\d+)\s*enchère", text, re.IGNORECASE)
+    bid_count = int(bid_match.group(1)) if bid_match else 0
 
-        if not next_btn:
-            break
+    # Prix courant et achat direct
+    current_price = None
+    buy_now_price = None
 
-        # Naviguer vers la page suivante
-        next_url = f"https://www.ricardo.ch{next_btn}" if next_btn.startswith("/") else next_btn
-        driver.get(next_url)
+    # Pattern: "300.00 (0 enchère) 350.00 Achat direct"
+    m1 = re.search(r"(\d+[.,]?\d*)\s*\(\d+\s*enchère", text, re.IGNORECASE)
+    if m1:
+        try:
+            current_price = float(m1.group(1).replace(",", "."))
+        except ValueError:
+            pass
+    m2 = re.search(r"(\d+[.,]?\d*)\s*Achat\s*direct", text, re.IGNORECASE)
+    if m2:
+        try:
+            buy_now_price = float(m2.group(1).replace(",", "."))
+        except ValueError:
+            pass
+
+    # Si pas d'enchère trouvée, prix = premier grand nombre (achat direct simple)
+    if current_price is None and buy_now_price is not None:
+        current_price = buy_now_price
+    if current_price is None and all_numbers:
+        # Filtrer les petits nombres (IDs, quantités)
+        big = [n for n in all_numbers if n >= 5]
+        if big:
+            current_price = big[0]
+
+    if current_price is None:
+        return None
+
+    return {
+        "title": title,
+        "listing_url": listing_url,
+        "image_url": image_url,
+        "current_price": current_price,
+        "buy_now_price": buy_now_price,
+        "bid_count": bid_count,
+        "region": "PAL",
+    }
+
+
+MAX_PAGES = 20  # garde-fou
+
+
+def _collect_listings_from_results(driver: Driver, search_url: str) -> list[dict]:
+    """Itère sur ?page=N jusqu'à épuisement des résultats."""
+    all_results: list[dict] = []
+    seen_urls: set[str] = set()
+
+    for page in range(1, MAX_PAGES + 1):
+        page_url = search_url if page == 1 else f"{search_url}?page={page}"
+        driver.google_get(page_url)
         driver.short_random_sleep()
-        driver.sleep(4)
-        page += 1
+        driver.sleep(6)
 
-        # Sécurité: max 20 pages
-        if page > 20:
+        soup = soupify(driver.page_html)
+        page_links = {a.get("href", "").split("?")[0] for a in soup.select('a[href*="/fr/a/"]')}
+
+        # Stop si page vide
+        if not page_links:
+            logger.info("Ricardo page %d: vide, arrêt pagination", page)
             break
 
-    return all_links
+        # Stop si toutes les URLs sont déjà vues (page identique → fin)
+        new_links = page_links - seen_urls
+        if not new_links:
+            logger.info("Ricardo page %d: aucun nouveau lien, arrêt pagination", page)
+            break
+
+        page_count = 0
+        for link in soup.select('a[href*="/fr/a/"]'):
+            href = link.get("href", "").split("?")[0]
+            if href in seen_urls:
+                continue
+            seen_urls.add(href)
+            listing = _extract_listing_from_card(link)
+            if listing:
+                all_results.append(listing)
+                page_count += 1
+
+        logger.info(
+            "Ricardo page %d: %d nouvelles annonces PAL (total: %d)",
+            page, page_count, len(all_results),
+        )
+
+    return all_results
 
 
 @browser(headless=True, reuse_driver=True, close_on_crash=True, output=None)
 def scrape_ricardo_console(driver: Driver, platform_slug: str):
-    """Scrape toutes les annonces Ricardo pour une console (toutes les pages)."""
+    """Scrape toutes les annonces Ricardo pour une console (toutes pages)."""
     search_query = CONSOLE_SEARCHES.get(platform_slug)
     if not search_query:
         return []
 
     search_url = f"https://www.ricardo.ch/fr/s/{search_query}"
+    results = _collect_listings_from_results(driver, search_url)
+    logger.info("Ricardo %s: %d annonces PAL totales", platform_slug, len(results))
 
-    # 1. Collecter toutes les URLs d'annonces (pagination)
-    listing_links = _collect_listing_urls(driver, search_url)
-    logger.info("Ricardo %s: %d annonces totales", platform_slug, len(listing_links))
-
-    # 2. Visiter chaque annonce
-    results = []
-    for url in listing_links:
-        listing = _extract_listing_from_page(driver, url)
-        if listing:
-            listing["platform_slug"] = platform_slug
-            results.append(listing)
+    # Ajout du platform_slug sur chaque annonce
+    for r in results:
+        r["platform_slug"] = platform_slug
 
     return results
+
+
+# --- Recherche ciblée par titre de jeu ---
+
+# Mots-clés console à ajouter à la query pour cibler la bonne plateforme
+PLATFORM_KEYWORDS = {
+    "snes": "snes",
+    "nes": "nes",
+    "n64": "n64",
+    "gba": "gba",
+    "saturn": "saturn",
+    "neo": "neogeo",
+}
+
+
+def _build_targeted_url(game_title: str, platform_slug: str) -> str:
+    """Construit l'URL de recherche ciblée pour un jeu donné."""
+    # Nettoyer le titre : retirer ponctuation, sous-titres après ":"
+    clean = re.sub(r"[!?'’`]", "", game_title)
+    if ":" in clean:
+        clean = clean.split(":", 1)[0].strip()
+    # Espaces → %20
+    clean = re.sub(r"\s+", " ", clean).strip()
+    encoded = clean.replace(" ", "%20")
+    keyword = PLATFORM_KEYWORDS.get(platform_slug, "")
+    if keyword:
+        encoded = f"{encoded}%20{keyword}"
+    return f"https://www.ricardo.ch/fr/s/{encoded}"
+
+
+def _scrape_first_page_for_targeted(driver: Driver, search_url: str) -> list[dict]:
+    """Pour une recherche ciblée, on scrape uniquement la première page (résultats les plus pertinents)."""
+    driver.google_get(search_url)
+    driver.short_random_sleep()
+    driver.sleep(5)
+
+    soup = soupify(driver.page_html)
+    results = []
+    seen = set()
+    for link in soup.select('a[href*="/fr/a/"]'):
+        href = link.get("href", "").split("?")[0]
+        if href in seen:
+            continue
+        seen.add(href)
+        listing = _extract_listing_from_card(link)
+        if listing:
+            results.append(listing)
+    return results
+
+
+@browser(headless=True, reuse_driver=True, close_on_crash=True, output=None)
+def scrape_ricardo_for_games(driver: Driver, spec: dict):
+    """Recherche Ricardo ciblée pour UN jeu (botasaurus appelle 1 fois par item).
+
+    `spec` : dict {game_id, title, platform_slug}
+    Retourne : dict {game_id, platform_slug, search_url, listings}
+    """
+    url = _build_targeted_url(spec["title"], spec["platform_slug"])
+    try:
+        listings = _scrape_first_page_for_targeted(driver, url)
+    except Exception as e:
+        logger.warning("Ricardo targeted '%s' (%s): %s", spec["title"], spec["platform_slug"], e)
+        listings = []
+    for l in listings:
+        l["platform_slug"] = spec["platform_slug"]
+    return {
+        "game_id": spec["game_id"],
+        "title": spec["title"],
+        "platform_slug": spec["platform_slug"],
+        "search_url": url,
+        "listings": listings,
+    }

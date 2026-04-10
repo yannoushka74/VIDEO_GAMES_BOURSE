@@ -10,8 +10,6 @@ function GameCard({ game }: Props) {
   const navigate = useNavigate();
 
   const lp = game.latest_price;
-  const currency = lp?.currency === "USD" ? "$" : lp?.currency === "CHF" ? "CHF " : "€";
-
   return (
     <div className="game-card" onClick={() => navigate(`/games/${game.id}`)}>
       {game.cover_url ? (

@@ -17,6 +17,7 @@ os.environ["DJANGO_ALLOW_ASYNC_UNSAFE"] = "true"
 from django.core.management.base import BaseCommand
 
 from scrapers.ebay import EbayScraper, search_ebay, detect_region
+from scrapers.matching import is_likely_accessory
 from games.models import Game, Listing
 
 RETRO_SLUGS = {"neo", "nes", "snes", "gba", "saturn", "n64"}
@@ -34,9 +35,18 @@ class Command(BaseCommand):
         parser.add_argument("--delay", type=float, default=0.5, help="Délai entre requêtes (défaut: 0.5)")
 
     def handle(self, *args, **options):
+        # Déterminer les plateformes ciblées (pour le clear)
+        if options["platform"]:
+            target_slugs = [p.strip().lower() for p in options["platform"].split(",")]
+        else:
+            target_slugs = list(RETRO_SLUGS)
+
         if options["clear"]:
-            deleted = Listing.objects.filter(source=Listing.Source.EBAY).delete()
-            self.stdout.write(f"Supprimé {deleted[0]} anciennes annonces eBay")
+            deleted = Listing.objects.filter(
+                source=Listing.Source.EBAY,
+                platform_slug__in=target_slugs,
+            ).delete()
+            self.stdout.write(f"Supprimé {deleted[0]} anciennes annonces eBay ({','.join(target_slugs)})")
 
         # Charger le scraper (pour les clés .env)
         scraper = EbayScraper(delay=options["delay"])
@@ -98,8 +108,16 @@ class Command(BaseCommand):
                 continue
 
             count = 0
+            skipped = 0
             for item in items:
+                # Filtrer accessoires, notices, publicités
+                if is_likely_accessory(item["title"]):
+                    skipped += 1
+                    continue
                 region = detect_region(item["title"])
+                # Éviter les doublons (même URL)
+                if Listing.objects.filter(source=Listing.Source.EBAY, listing_url=item["listing_url"]).exists():
+                    continue
                 Listing.objects.create(
                     game=game,
                     source=Listing.Source.EBAY,

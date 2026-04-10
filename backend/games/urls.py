@@ -13,4 +13,6 @@ urlpatterns = [
     path("stats/", views.api_stats, name="api-stats"),
     path("top/", views.top_expensive, name="top-expensive"),
     path("autocomplete/", views.autocomplete, name="autocomplete"),
+    path("opportunities/", views.opportunities, name="opportunities"),
+    path("exchange-rates/", views.exchange_rates, name="exchange-rates"),
 ]

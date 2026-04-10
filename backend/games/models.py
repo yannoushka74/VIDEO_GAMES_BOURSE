@@ -39,11 +39,24 @@ class Game(models.Model):
         JEU = 9, "Jeu"
         FICHE_GENERIQUE = 49, "Fiche de jeu générique"
 
+    class PalStatus(models.TextChoices):
+        UNKNOWN = "unknown", "Inconnu"
+        PAL = "pal", "Sorti en PAL"
+        NOT_PAL = "not_pal", "Pas de version PAL"
+
     jvc_id = models.IntegerField(unique=True, help_text="ID jeuxvideo.com")
     title = models.CharField(max_length=500, db_index=True)
+    title_en = models.CharField(max_length=500, blank=True, help_text="Titre anglais (PriceCharting)")
     game_type = models.IntegerField(choices=GameType.choices, default=GameType.JEU)
     release_date = models.CharField(max_length=100, blank=True)
     cover_url = models.URLField(max_length=500, blank=True)
+    pal_status = models.CharField(
+        max_length=10,
+        choices=PalStatus.choices,
+        default=PalStatus.UNKNOWN,
+        db_index=True,
+        help_text="Statut PAL déterminé via IGDB release_dates",
+    )
 
     machines = models.ManyToManyField(Machine, related_name="games", blank=True)
     genres = models.ManyToManyField(Genre, related_name="games", blank=True)

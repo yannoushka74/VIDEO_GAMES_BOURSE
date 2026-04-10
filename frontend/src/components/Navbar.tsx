@@ -13,6 +13,9 @@ function Navbar() {
         <li>
           <Link to="/games">Catalogue</Link>
         </li>
+        <li>
+          <Link to="/opportunities">Bonnes affaires</Link>
+        </li>
       </ul>
     </nav>
   );

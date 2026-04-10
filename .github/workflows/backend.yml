@@ -1,0 +1,41 @@
+name: Backend CI/CD
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/backend.yml'
+
+jobs:
+  deploy-backend:
+    runs-on: [self-hosted, minix]
+    defaults:
+      run:
+        working-directory: ${{ github.workspace }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build backend image
+        run: |
+          echo 'Totoro12345!' | sudo -S docker build -t vgb-backend:latest backend/
+
+      - name: Build scraper image
+        run: |
+          echo 'Totoro12345!' | sudo -S docker build -t vgb-scraper:latest -f backend/Dockerfile.scraper backend/
+
+      - name: Import images to K3s
+        run: |
+          echo 'Totoro12345!' | sudo -S sh -c 'docker save vgb-backend:latest | k3s ctr images import -'
+          echo 'Totoro12345!' | sudo -S sh -c 'docker save vgb-scraper:latest | k3s ctr images import -'
+
+      - name: Run migrations
+        run: |
+          kubectl exec -n videogames deployment/vgb-backend -- python manage.py migrate --noinput 2>/dev/null || true
+
+      - name: Rollout restart
+        run: |
+          kubectl rollout restart deployment vgb-backend -n videogames
+          kubectl rollout status deployment vgb-backend -n videogames --timeout=120s

@@ -1,0 +1,77 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vgb-backend
+  namespace: videogames
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: vgb-backend
+  template:
+    metadata:
+      labels:
+        app: vgb-backend
+    spec:
+      initContainers:
+      - name: migrate
+        image: vgb-backend:latest
+        imagePullPolicy: Never
+        command: ["python", "manage.py", "migrate", "--noinput"]
+        env:
+        - name: POSTGRES_HOST
+          value: vgb-postgres
+        - name: POSTGRES_PORT
+          value: "5432"
+        - name: POSTGRES_DB
+          value: videogames_bourse
+        - name: POSTGRES_USER
+          value: vgb_user
+        - name: POSTGRES_PASSWORD
+          value: vgb_password
+        - name: DJANGO_DEBUG
+          value: "False"
+        - name: DJANGO_ALLOWED_HOSTS
+          value: "*"
+      containers:
+      - name: backend
+        image: vgb-backend:latest
+        imagePullPolicy: Never
+        env:
+        - name: POSTGRES_HOST
+          value: vgb-postgres
+        - name: POSTGRES_PORT
+          value: "5432"
+        - name: POSTGRES_DB
+          value: videogames_bourse
+        - name: POSTGRES_USER
+          value: vgb_user
+        - name: POSTGRES_PASSWORD
+          value: vgb_password
+        - name: DJANGO_DEBUG
+          value: "False"
+        - name: DJANGO_ALLOWED_HOSTS
+          value: "*"
+        - name: DJANGO_SECRET_KEY
+          value: "k8s-prod-secret-change-me-later"
+        ports:
+        - containerPort: 8000
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vgb-backend
+  namespace: videogames
+spec:
+  selector:
+    app: vgb-backend
+  ports:
+  - port: 8000
+    targetPort: 8000

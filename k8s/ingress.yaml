@@ -1,0 +1,15 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: vgb-ts-ingress
+  namespace: videogames
+spec:
+  ingressClassName: tailscale
+  defaultBackend:
+    service:
+      name: vgb-frontend
+      port:
+        number: 80
+  tls:
+  - hosts:
+    - videogames

@@ -1,13 +1,31 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { getGame } from "../api";
-import type { Game, Price, Listing } from "../types";
+import type { Game, Price } from "../types";
 import PriceChartingIcon from "../components/PriceChartingIcon";
+import PriceHistoryChart from "../components/PriceHistoryChart";
 
 function formatPrice(value: string | null, currency: string) {
   if (!value) return null;
   const num = parseFloat(value).toFixed(2);
   return currency === "USD" ? `$${num}` : `${num} ${currency}`;
+}
+
+function PriceLine({ label, usd, chf, cls }: { label: string; usd: string | null; chf: string | null; cls?: string }) {
+  if (!usd) return null;
+  return (
+    <div className="price-card__collector-item">
+      <span className="price-card__collector-label">{label}</span>
+      <span className={`price-card__collector-value ${cls || ""}`}>
+        {formatPrice(usd, "USD")}
+        {chf && (
+          <span style={{ color: "var(--text-secondary)", fontSize: "0.8rem", marginLeft: 6 }}>
+            ({formatPrice(chf, "CHF")})
+          </span>
+        )}
+      </span>
+    </div>
+  );
 }
 
 function PriceChartingCard({ p }: { p: Price }) {
@@ -23,28 +41,10 @@ function PriceChartingCard({ p }: { p: Price }) {
         <span>PriceCharting</span>
       </div>
       <div className="price-card__collector">
-        <div className="price-card__collector-item">
-          <span className="price-card__collector-label">Loose</span>
-          <span className="price-card__collector-value">{formatPrice(p.price, p.currency)}</span>
-        </div>
-        {p.cib_price && (
-          <div className="price-card__collector-item">
-            <span className="price-card__collector-label">Complet (CIB)</span>
-            <span className="price-card__collector-value">{formatPrice(p.cib_price, p.currency)}</span>
-          </div>
-        )}
-        {p.new_price && (
-          <div className="price-card__collector-item">
-            <span className="price-card__collector-label">Neuf scelle</span>
-            <span className="price-card__collector-value price-card__collector-value--high">{formatPrice(p.new_price, p.currency)}</span>
-          </div>
-        )}
-        {p.graded_price && (
-          <div className="price-card__collector-item">
-            <span className="price-card__collector-label">Grade (WATA/VGA)</span>
-            <span className="price-card__collector-value price-card__collector-value--premium">{formatPrice(p.graded_price, p.currency)}</span>
-          </div>
-        )}
+        <PriceLine label="Loose" usd={p.price} chf={p.price_chf} />
+        <PriceLine label="Complet (CIB)" usd={p.cib_price} chf={p.cib_price_chf} />
+        <PriceLine label="Neuf scelle" usd={p.new_price} chf={p.new_price_chf} cls="price-card__collector-value--high" />
+        <PriceLine label="Grade (WATA/VGA)" usd={p.graded_price} chf={p.graded_price_chf} cls="price-card__collector-value--premium" />
       </div>
       {(p.box_only_price || p.manual_only_price) && (
         <div className="price-card__extras">
@@ -129,6 +129,9 @@ function GameDetailPage() {
 
         <div>
           <h1 className="game-detail__title">{game.title}</h1>
+          {game.title_en && game.title_en !== game.title && (
+            <p className="game-detail__title-en">{game.title_en}</p>
+          )}
           <p className="game-detail__release">
             {game.release_date || "Date de sortie inconnue"}
           </p>
@@ -140,6 +143,10 @@ function GameDetailPage() {
               {priceChartingPrices.map((p) => (
                 <PriceChartingCard key={p.id} p={p} />
               ))}
+              <h4 style={{ marginTop: "1rem", marginBottom: "0.25rem", fontSize: "0.95rem" }}>
+                Évolution de la cote
+              </h4>
+              <PriceHistoryChart gameId={game.id} />
             </div>
           )}
 

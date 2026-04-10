@@ -11,9 +11,9 @@ import os
 os.environ["DJANGO_ALLOW_ASYNC_UNSAFE"] = "true"
 
 from django.core.management.base import BaseCommand
-from django.utils import timezone
 
 from games.models import Game, Listing
+from scrapers.matching import match_listing_title
 from scrapers.ricardo import scrape_ricardo_console, CONSOLE_SEARCHES
 
 
@@ -39,10 +39,18 @@ class Command(BaseCommand):
             platforms = list(CONSOLE_SEARCHES.keys())
 
         if options["clear"]:
-            deleted = Listing.objects.filter(source=Listing.Source.RICARDO).delete()
-            self.stdout.write(f"Supprimé {deleted[0]} anciennes annonces Ricardo")
+            # Ne supprime que les annonces des plateformes ciblées par ce run
+            # (sinon un run multi-console séquentiel s'efface lui-même)
+            deleted = Listing.objects.filter(
+                source=Listing.Source.RICARDO,
+                platform_slug__in=platforms,
+            ).delete()
+            self.stdout.write(
+                f"Supprimé {deleted[0]} anciennes annonces Ricardo ({','.join(platforms)})"
+            )
 
         total_found = 0
+        total_matched = 0
 
         for platform in platforms:
             if platform not in CONSOLE_SEARCHES:
@@ -59,41 +67,13 @@ class Command(BaseCommand):
                 self.stdout.write(self.style.WARNING("  Aucune annonce trouvée"))
                 continue
 
-            # Mots trop courants à ignorer pour le matching
-            STOP_WORDS = {
-                "super", "nintendo", "snes", "nes", "n64", "game", "boy", "advance",
-                "gba", "neo", "geo", "sega", "saturn", "jeu", "spiel", "für", "fuer",
-                "famicom", "the", "of", "and", "de", "la", "le", "les", "du", "des",
-                "a", "an", "in", "on", "for", "mit", "ovp", "pal", "ntsc", "japan",
-                "usa", "eur", "komplett", "original", "top", "1", "2", "3", "4", "5",
-                "ii", "iii", "iv", "v", "-", ":", "&",
-            }
-
-            # Pré-calculer les mots significatifs de chaque jeu
-            platform_games = list(Game.objects.filter(machines__slug=platform).distinct())
-            game_word_index = {}
-            for g in platform_games:
-                words = {w for w in g.title.lower().split() if w not in STOP_WORDS and len(w) > 2}
-                game_word_index[g] = words
+            # Pré-charger les jeux de la plateforme (filtre cheap)
+            candidate_games = list(
+                Game.objects.filter(machines__slug=platform).distinct()
+            )
 
             for r in results:
-                title_words = {w for w in r["title"].lower().split() if w not in STOP_WORDS and len(w) > 2}
-                game = None
-                best_score = 0
-
-                for g, game_words in game_word_index.items():
-                    if not game_words:
-                        continue
-                    common = title_words & game_words
-                    # Score = proportion de mots du jeu trouvés dans l'annonce
-                    score = len(common) / len(game_words) if game_words else 0
-                    if score > best_score and len(common) >= 2:
-                        best_score = score
-                        game = g
-
-                # Seuil minimum : au moins 50% des mots du jeu doivent matcher
-                if best_score < 0.5:
-                    game = None
+                game, score = match_listing_title(r["title"], candidate_games)
 
                 Listing.objects.create(
                     game=game,
@@ -107,14 +87,22 @@ class Command(BaseCommand):
                     currency="CHF",
                     bid_count=r.get("bid_count", 0),
                     ends_at=None,
+                    region=r.get("region", "PAL"),
                 )
 
-                matched = f" -> {game.title}" if game else ""
+                if game:
+                    total_matched += 1
+                    matched = f" -> {game.title} ({score})"
+                else:
+                    matched = ""
                 self.stdout.write(
                     f"  CHF {r['current_price']:>8} | {r['bid_count']:>2} ench. | {r['title'][:45]}{matched}"
                 )
                 total_found += 1
 
+        pct = (total_matched * 100 // total_found) if total_found else 0
         self.stdout.write(
-            self.style.SUCCESS(f"\nTerminé ! {total_found} annonces importées.")
+            self.style.SUCCESS(
+                f"\nTerminé ! {total_found} annonces importées, {total_matched} matchées ({pct}%)."
+            )
         )

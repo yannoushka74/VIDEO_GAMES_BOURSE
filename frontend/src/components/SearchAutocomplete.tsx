@@ -13,7 +13,7 @@ function SearchAutocomplete({ value, onChange }: Props) {
   const [activeIndex, setActiveIndex] = useState(-1);
   const navigate = useNavigate();
   const wrapperRef = useRef<HTMLDivElement>(null);
-  const timerRef = useRef<ReturnType<typeof setTimeout>>();
+  const timerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   // Debounced fetch
   useEffect(() => {

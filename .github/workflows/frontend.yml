@@ -1,0 +1,32 @@
+name: Frontend CI/CD
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/frontend.yml'
+
+jobs:
+  deploy-frontend:
+    runs-on: [self-hosted, minix]
+    defaults:
+      run:
+        working-directory: ${{ github.workspace }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build frontend image
+        run: |
+          echo 'Totoro12345!' | sudo -S docker build -t vgb-frontend:latest frontend/
+
+      - name: Import image to K3s
+        run: |
+          echo 'Totoro12345!' | sudo -S sh -c 'docker save vgb-frontend:latest | k3s ctr images import -'
+
+      - name: Rollout restart
+        run: |
+          kubectl rollout restart deployment vgb-frontend -n videogames
+          kubectl rollout status deployment vgb-frontend -n videogames --timeout=120s

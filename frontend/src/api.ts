@@ -1,4 +1,12 @@
-import type { Game, Genre, Machine, PaginatedResponse, Stats } from "./types";
+import type {
+  Game,
+  Genre,
+  Machine,
+  Opportunity,
+  PaginatedResponse,
+  PriceHistoryPoint,
+  Stats,
+} from "./types";
 
 const API_BASE = "/api";
 
@@ -35,8 +43,11 @@ export interface TopGame {
   cover_url: string;
   machines: string[];
   loose_price: string;
+  loose_price_chf: string | null;
   cib_price: string | null;
+  cib_price_chf: string | null;
   new_price: string | null;
+  new_price_chf: string | null;
   graded_price: string | null;
   currency: string;
   ricardo_price: string | null;
@@ -57,4 +68,13 @@ export interface AutocompleteSuggestion {
 
 export function getAutocomplete(q: string): Promise<AutocompleteSuggestion[]> {
   return fetchJSON(`${API_BASE}/autocomplete/?q=${encodeURIComponent(q)}`);
+}
+
+export function getPriceHistory(gameId: number): Promise<PriceHistoryPoint[]> {
+  return fetchJSON(`${API_BASE}/games/${gameId}/price-history/`);
+}
+
+export function getOpportunities(params: Record<string, string> = {}): Promise<Opportunity[]> {
+  const query = new URLSearchParams(params).toString();
+  return fetchJSON(`${API_BASE}/opportunities/?${query}`);
 }

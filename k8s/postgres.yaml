@@ -1,0 +1,65 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: vgb-postgres-pvc
+  namespace: videogames
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vgb-postgres
+  namespace: videogames
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: vgb-postgres
+  template:
+    metadata:
+      labels:
+        app: vgb-postgres
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:16-alpine
+        env:
+        - name: POSTGRES_DB
+          value: videogames_bourse
+        - name: POSTGRES_USER
+          value: vgb_user
+        - name: POSTGRES_PASSWORD
+          value: vgb_password
+        ports:
+        - containerPort: 5432
+        volumeMounts:
+        - name: pgdata
+          mountPath: /var/lib/postgresql/data
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+      volumes:
+      - name: pgdata
+        persistentVolumeClaim:
+          claimName: vgb-postgres-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vgb-postgres
+  namespace: videogames
+spec:
+  selector:
+    app: vgb-postgres
+  ports:
+  - port: 5432
+    targetPort: 5432

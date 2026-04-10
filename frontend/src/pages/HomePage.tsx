@@ -18,6 +18,11 @@ function formatUSD(value: string | null) {
   return `$${parseFloat(value).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
 }
 
+function formatCHF(value: string | null) {
+  if (!value) return "";
+  return `${parseFloat(value).toLocaleString("fr-CH", { minimumFractionDigits: 0, maximumFractionDigits: 0 })} CHF`;
+}
+
 function HomePage() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [topGames, setTopGames] = useState<TopGame[]>([]);
@@ -47,7 +52,14 @@ function HomePage() {
         <div className="stats">
           <div className="stat-card">
             <div className="stat-card__value">{stats.games_count.toLocaleString("fr-FR")}</div>
-            <div className="stat-card__label">Jeux retro</div>
+            <div className="stat-card__label">
+              Jeux PAL vérifiés
+              {stats.games_count_total && (
+                <span style={{ color: "var(--text-secondary)", fontSize: "0.75rem", display: "block" }}>
+                  sur {stats.games_count_total.toLocaleString("fr-FR")} importés
+                </span>
+              )}
+            </div>
           </div>
           <div className="stat-card">
             <div className="stat-card__value">{stats.machines_count}</div>
@@ -120,8 +132,22 @@ function HomePage() {
                     ))}
                   </div>
                 </td>
-                <td className="top-table__price top-table__price--loose">{formatUSD(game.loose_price)}</td>
-                <td className="top-table__price">{formatUSD(game.cib_price)}</td>
+                <td className="top-table__price top-table__price--loose">
+                  {formatUSD(game.loose_price)}
+                  {game.loose_price_chf && (
+                    <span style={{ display: "block", color: "var(--text-secondary)", fontSize: "0.75rem" }}>
+                      {formatCHF(game.loose_price_chf)}
+                    </span>
+                  )}
+                </td>
+                <td className="top-table__price">
+                  {formatUSD(game.cib_price)}
+                  {game.cib_price_chf && (
+                    <span style={{ display: "block", color: "var(--text-secondary)", fontSize: "0.75rem" }}>
+                      {formatCHF(game.cib_price_chf)}
+                    </span>
+                  )}
+                </td>
                 <td className="top-table__price top-table__price--new">{formatUSD(game.new_price)}</td>
                 <td className="top-table__price top-table__price--graded">{formatUSD(game.graded_price)}</td>
                 <td className="top-table__price top-table__price--ricardo">
