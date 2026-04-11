@@ -22,7 +22,7 @@ from scrapers.ebay import EbayScraper, search_ebay, detect_region
 from scrapers.matching import is_likely_accessory
 from games.models import Game, Listing, Price
 
-RETRO_SLUGS = {"neo", "nes", "snes", "gba", "saturn", "n64"}
+RETRO_SLUGS = {"neo", "nes", "snes", "gba", "saturn", "n64", "ps1", "dreamcast"}
 
 
 class Command(BaseCommand):

@@ -299,12 +299,12 @@ ACCESSORY_PHRASES = (
 # Phrases indiquant une console DIFFÉRENTE des cibles (PS, Xbox, Wii, etc.)
 # Matché en substring sur le titre normalisé.
 ALIEN_PLATFORM_PHRASES = (
-    "ps1", "ps2", "ps3", "ps4", "ps5",
-    "psp", "psvita", "ps vita", "playstation", " umd",
+    "ps2", "ps3", "ps4", "ps5",
+    "psp", "psvita", "ps vita", " umd",
     "xbox", "xbox 360", "xbox one",
     "wii u", "wiiu", "wii ", "gamecube", "game cube",
     " ds ", " 3ds", " 2ds", " switch",
-    "mega drive", "megadrive", "genesis", "dreamcast", "master system", "game gear", "gamegear",
+    "mega drive", "megadrive", "genesis", "master system", "game gear", "gamegear",
     "game boy color", "gameboy color", "gbc",
     "atari", "jaguar", "lynx", "intellivision",
     "amiga", "amstrad", "c64", "commodore", "spectrum", " msx ",
@@ -322,6 +322,8 @@ ACCEPTED_PLATFORM_PHRASES = {
     "gba": ("gba", "game boy advance", "gameboy advance"),
     "saturn": ("saturn", "sega saturn"),
     "neo": ("neo geo", "neogeo", "neo-geo"),
+    "ps1": ("ps1", "psx", "playstation"),
+    "dreamcast": ("dreamcast", "sega dreamcast"),
 }
 
 

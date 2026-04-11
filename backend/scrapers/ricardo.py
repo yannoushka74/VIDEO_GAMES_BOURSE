@@ -29,6 +29,8 @@ CONSOLE_SEARCHES = {
     "neo": "neo%20geo%20jeu",
     "gba": "game%20boy%20advance%20jeu",
     "saturn": "sega%20saturn%20jeu",
+    "ps1": "playstation%20jeu",
+    "dreamcast": "dreamcast%20jeu",
 }
 
 # Filtre PAL Europe : rejette tout titre mentionnant JP/Japan/Famicom/US/USA/NTSC.
@@ -259,6 +261,8 @@ PLATFORM_KEYWORDS = {
     "gba": "gba",
     "saturn": "saturn",
     "neo": "neogeo",
+    "ps1": "playstation",
+    "dreamcast": "dreamcast",
 }
 
 

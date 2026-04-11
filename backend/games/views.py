@@ -16,7 +16,7 @@ from .serializers import (
 )
 
 # Plateformes rétro collector uniquement
-RETRO_SLUGS = ["neo", "nes", "snes", "gba", "saturn", "n64"]
+RETRO_SLUGS = ["neo", "nes", "snes", "gba", "saturn", "n64", "ps1", "dreamcast"]
 
 
 def _latest_pc_price_subquery():

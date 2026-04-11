@@ -34,6 +34,8 @@ PLATFORM_FILTERS = {
     "neo": "Neo Geo",
     "gba": "Game Boy Advance",
     "saturn": "Sega Saturn",
+    "ps1": "Sony PlayStation",
+    "dreamcast": "Sega Dreamcast",
 }
 
 # Patterns de détection de région dans les titres

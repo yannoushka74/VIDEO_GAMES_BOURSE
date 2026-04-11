@@ -25,7 +25,7 @@ from scrapers.matching import (
 )
 from scrapers.ricardo import scrape_ricardo_for_games
 
-RETRO_SLUGS = ["snes", "nes", "n64", "gba", "saturn", "neo"]
+RETRO_SLUGS = ["snes", "nes", "n64", "gba", "saturn", "neo", "ps1", "dreamcast"]
 
 
 class Command(BaseCommand):
