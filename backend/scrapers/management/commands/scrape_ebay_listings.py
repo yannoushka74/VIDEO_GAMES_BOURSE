@@ -16,9 +16,11 @@ os.environ["DJANGO_ALLOW_ASYNC_UNSAFE"] = "true"
 
 from django.core.management.base import BaseCommand
 
+from django.db.models import Exists, OuterRef, Q
+
 from scrapers.ebay import EbayScraper, search_ebay, detect_region
 from scrapers.matching import is_likely_accessory
-from games.models import Game, Listing
+from games.models import Game, Listing, Price
 
 RETRO_SLUGS = {"neo", "nes", "snes", "gba", "saturn", "n64"}
 
@@ -30,9 +32,10 @@ class Command(BaseCommand):
         parser.add_argument("--platform", type=str, help="Console(s) séparées par virgule")
         parser.add_argument("--game", type=str, help="Recherche par titre")
         parser.add_argument("--limit", type=int, default=50, help="Nombre de jeux (défaut: 50)")
-        parser.add_argument("--all", action="store_true", help="Tous les jeux")
+        parser.add_argument("--all", action="store_true", help="Tous les jeux PAL-vérifiés")
         parser.add_argument("--clear", action="store_true", help="Supprimer les anciennes annonces eBay")
         parser.add_argument("--delay", type=float, default=0.5, help="Délai entre requêtes (défaut: 0.5)")
+        parser.add_argument("--include-unverified", action="store_true", help="Inclure les jeux non PAL-vérifiés")
 
     def handle(self, *args, **options):
         # Déterminer les plateformes ciblées (pour le clear)
@@ -51,8 +54,14 @@ class Command(BaseCommand):
         # Charger le scraper (pour les clés .env)
         scraper = EbayScraper(delay=options["delay"])
 
-        # Sélection des jeux
+        # Sélection des jeux (PAL-vérifiés par défaut pour économiser les appels API)
+        has_pc = Exists(Price.objects.filter(game=OuterRef("pk"), source="pricecharting"))
+        has_ricardo = Exists(Listing.objects.filter(game=OuterRef("pk"), source="ricardo"))
         base_qs = Game.objects.filter(machines__slug__in=RETRO_SLUGS).distinct()
+
+        if not options.get("include_unverified"):
+            base_qs = base_qs.annotate(has_pc=has_pc, has_ricardo=has_ricardo)
+            base_qs = base_qs.filter(Q(pal_status="pal") | Q(has_pc=True) | Q(has_ricardo=True))
 
         if options["platform"]:
             slugs = [p.strip().lower() for p in options["platform"].split(",")]
@@ -98,10 +107,12 @@ class Command(BaseCommand):
                     platform_slug = m.slug
                     break
 
-            self.stdout.write(f"  [{i}/{total}] {game.title[:50]} ({platform_slug})...", ending=" ")
+            # Préférer title_en si dispo (meilleur match sur eBay FR)
+            search_title = game.title_en or game.title
+            self.stdout.write(f"  [{i}/{total}] {search_title[:50]} ({platform_slug})...", ending=" ")
 
             time.sleep(delay)
-            items = search_ebay(game.title, platform_slug, limit=10, pal_only=False)
+            items = search_ebay(search_title, platform_slug, limit=10, pal_only=False)
 
             if not items:
                 self.stdout.write(self.style.WARNING("0 annonces"))

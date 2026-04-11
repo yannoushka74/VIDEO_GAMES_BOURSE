@@ -62,10 +62,23 @@ def detect_region(title: str) -> str:
     return "unknown"
 
 
+_token_cache: dict[str, tuple[str, float]] = {}  # key → (token, expiry_timestamp)
+
+
 def _get_oauth_token() -> str | None:
+    """Obtient un token OAuth eBay, mis en cache ~1h50 (token valide 2h)."""
+    import time
+
     if not EBAY_APP_ID or not EBAY_CERT_ID:
         logger.error("EBAY_APP_ID ou EBAY_CERT_ID non configuré")
         return None
+
+    cache_key = EBAY_APP_ID
+    now = time.time()
+    if cache_key in _token_cache:
+        token, expiry = _token_cache[cache_key]
+        if now < expiry:
+            return token
 
     credentials = base64.b64encode(f"{EBAY_APP_ID}:{EBAY_CERT_ID}".encode()).decode()
     resp = requests.post(
@@ -81,9 +94,15 @@ def _get_oauth_token() -> str | None:
         timeout=15,
     )
     if resp.status_code != 200:
-        logger.error("Erreur OAuth eBay: %s", resp.status_code)
+        logger.error("Erreur OAuth eBay: %s %s", resp.status_code, resp.text[:200])
         return None
-    return resp.json().get("access_token")
+
+    data = resp.json()
+    token = data.get("access_token")
+    expires_in = data.get("expires_in", 7200)  # 2h par défaut
+    _token_cache[cache_key] = (token, now + expires_in - 600)  # marge 10 min
+    logger.info("eBay OAuth token obtenu (expire dans %ds)", expires_in)
+    return token
 
 
 def search_ebay(game_title: str, platform_slug: str = "", limit: int = 20, pal_only: bool = True) -> list[dict]:
