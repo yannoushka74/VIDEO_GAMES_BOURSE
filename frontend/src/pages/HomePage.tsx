@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { getStats, getTopExpensive, type TopGame } from "../api";
-import type { Stats } from "../types";
+import { getStats, getOpportunities } from "../api";
+import type { Opportunity, Stats } from "../types";
 
 const PLATFORMS = [
   { value: "", label: "Toutes" },
@@ -15,20 +15,11 @@ const PLATFORMS = [
   { value: "dreamcast", label: "Dreamcast" },
 ];
 
-function formatCHF(value: string | null) {
-  if (!value) return "-";
-  return `${parseFloat(value).toLocaleString("fr-CH", { minimumFractionDigits: 0, maximumFractionDigits: 0 })} CHF`;
-}
-
-function formatUSD(value: string | null) {
-  if (!value) return "";
-  return `$${parseFloat(value).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
-}
-
 function HomePage() {
   const [stats, setStats] = useState<Stats | null>(null);
-  const [topGames, setTopGames] = useState<TopGame[]>([]);
+  const [deals, setDeals] = useState<Opportunity[]>([]);
   const [platform, setPlatform] = useState("");
+  const [minDiscount, setMinDiscount] = useState("30");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -37,11 +28,13 @@ function HomePage() {
 
   useEffect(() => {
     setLoading(true);
-    getTopExpensive(platform || undefined)
-      .then(setTopGames)
+    const params: Record<string, string> = { limit: "100", min_discount: minDiscount };
+    if (platform) params.platform = platform;
+    getOpportunities(params)
+      .then(setDeals)
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, [platform]);
+  }, [platform, minDiscount]);
 
   return (
     <div>
@@ -55,10 +48,10 @@ function HomePage() {
           <div className="stat-card">
             <div className="stat-card__value">{stats.games_count.toLocaleString("fr-FR")}</div>
             <div className="stat-card__label">
-              Jeux PAL vérifiés
+              Jeux PAL
               {stats.games_count_total && (
                 <span style={{ color: "var(--text-secondary)", fontSize: "0.75rem", display: "block" }}>
-                  sur {stats.games_count_total.toLocaleString("fr-FR")} importés
+                  sur {stats.games_count_total.toLocaleString("fr-FR")} importes
                 </span>
               )}
             </div>
@@ -68,14 +61,14 @@ function HomePage() {
             <div className="stat-card__label">Consoles</div>
           </div>
           <div className="stat-card">
-            <div className="stat-card__value">{topGames.length}</div>
-            <div className="stat-card__label">Jeux cotes</div>
+            <div className="stat-card__value">{deals.length}</div>
+            <div className="stat-card__label">Deals en cours</div>
           </div>
         </div>
       )}
 
-      <div style={{ display: "flex", alignItems: "center", gap: "1rem", marginBottom: "1rem", marginTop: "2rem" }}>
-        <h2>Top 200 - Jeux les plus chers</h2>
+      <div style={{ display: "flex", alignItems: "center", gap: "1rem", marginBottom: "1rem", marginTop: "2rem", flexWrap: "wrap" }}>
+        <h2>Meilleures affaires</h2>
         <select
           value={platform}
           onChange={(e) => setPlatform(e.target.value)}
@@ -92,12 +85,33 @@ function HomePage() {
             <option key={p.value} value={p.value}>{p.label}</option>
           ))}
         </select>
+        <select
+          value={minDiscount}
+          onChange={(e) => setMinDiscount(e.target.value)}
+          style={{
+            background: "var(--bg-secondary)",
+            border: "1px solid var(--border)",
+            borderRadius: "var(--radius)",
+            color: "var(--text-primary)",
+            padding: "0.4rem 0.8rem",
+            fontSize: "0.9rem",
+          }}
+        >
+          <option value="10">-10%</option>
+          <option value="20">-20%</option>
+          <option value="30">-30%</option>
+          <option value="50">-50%</option>
+        </select>
       </div>
+
+      <p style={{ color: "var(--text-secondary)", fontSize: "0.85rem", marginBottom: "1rem" }}>
+        Annonces Ricardo et eBay sous la cote PriceCharting (comparaison par condition : loose vs loose, CIB vs CIB).
+      </p>
 
       {loading ? (
         <p className="loading">Chargement...</p>
-      ) : topGames.length === 0 ? (
-        <p className="loading">Aucun prix disponible. Lancez le scraping PriceCharting.</p>
+      ) : deals.length === 0 ? (
+        <p className="loading">Aucun deal trouve avec ces criteres.</p>
       ) : (
         <table className="top-table">
           <thead>
@@ -106,64 +120,86 @@ function HomePage() {
               <th></th>
               <th>Jeu</th>
               <th>Console</th>
-              <th>Loose</th>
-              <th>Complet (CIB)</th>
-              <th>Neuf</th>
-              <th>Grade</th>
-              <th>Ricardo</th>
+              <th>Etat</th>
+              <th>Prix annonce</th>
+              <th>Cote</th>
+              <th>Decote</th>
+              <th>Source</th>
             </tr>
           </thead>
           <tbody>
-            {topGames.map((game, i) => (
-              <tr key={game.id}>
+            {deals.map((d, i) => (
+              <tr key={`${d.listing_id}-${i}`}>
                 <td className="top-table__rank">{i + 1}</td>
                 <td>
-                  {game.cover_url && (
-                    <img className="top-table__cover" src={game.cover_url} alt="" />
+                  {d.cover_url && (
+                    <img className="top-table__cover" src={d.cover_url} alt="" />
                   )}
                 </td>
                 <td>
-                  <Link to={`/games/${game.id}`} className="top-table__title">
-                    {game.title}
+                  <Link to={`/games/${d.game_id}`} className="top-table__title">
+                    {d.title}
                   </Link>
-                </td>
-                <td>
-                  <div className="tags">
-                    {game.machines.map((m) => (
-                      <span key={m} className="tag">{m}</span>
-                    ))}
+                  <div style={{ fontSize: "0.75rem", color: "var(--text-secondary)", marginTop: 2 }}>
+                    <a href={d.listing_url} target="_blank" rel="noopener noreferrer" style={{ color: "var(--text-secondary)" }}>
+                      {d.listing_title.length > 50 ? d.listing_title.slice(0, 50) + "..." : d.listing_title}
+                    </a>
                   </div>
                 </td>
-                <td className="top-table__price top-table__price--loose">
-                  {formatCHF(game.loose_price_chf)}
-                  <span style={{ display: "block", color: "var(--text-secondary)", fontSize: "0.75rem" }}>
-                    {formatUSD(game.loose_price)}
+                <td>
+                  <span className="tag">{d.platform_slug.toUpperCase()}</span>
+                </td>
+                <td>
+                  <span className="tag" style={{
+                    background: d.listing_condition === "cib" ? "#1d4ed8"
+                      : d.listing_condition === "new" ? "#15803d"
+                      : d.listing_condition === "graded" ? "#7e22ce"
+                      : "var(--bg-secondary)",
+                    color: "white",
+                    fontSize: "0.75rem",
+                  }}>
+                    {d.listing_condition || "loose"}
                   </span>
                 </td>
                 <td className="top-table__price">
-                  {formatCHF(game.cib_price_chf)}
-                  {game.cib_price && (
+                  {d.listing_price_chf.toFixed(0)} CHF
+                  {d.listing_currency !== "CHF" && (
                     <span style={{ display: "block", color: "var(--text-secondary)", fontSize: "0.75rem" }}>
-                      {formatUSD(game.cib_price)}
+                      {d.listing_price_eur.toFixed(0)} EUR
                     </span>
                   )}
                 </td>
-                <td className="top-table__price top-table__price--new">
-                  {formatCHF(game.new_price_chf)}
+                <td className="top-table__price">
+                  {Math.round(d.ref_price_usd * 0.79)} CHF
+                  <span style={{ display: "block", color: "var(--text-secondary)", fontSize: "0.75rem" }}>
+                    ${d.ref_price_usd.toFixed(0)} {d.ref_source}
+                  </span>
                 </td>
-                <td className="top-table__price top-table__price--graded">
-                  {game.graded_price ? formatUSD(game.graded_price) : "-"}
+                <td>
+                  <span
+                    className="tag"
+                    style={{
+                      background: d.discount_percent >= 70 ? "#dc2626"
+                        : d.discount_percent >= 50 ? "#ea580c"
+                        : d.discount_percent >= 30 ? "#16a34a"
+                        : "#0891b2",
+                      color: "white",
+                      fontWeight: "bold",
+                    }}
+                  >
+                    -{d.discount_percent.toFixed(0)}%
+                  </span>
                 </td>
-                <td className="top-table__price top-table__price--ricardo">
-                  {game.ricardo_price ? (
-                    <a href={game.ricardo_url || "#"} target="_blank" rel="noopener noreferrer">
-                      {parseFloat(game.ricardo_price).toFixed(0)} CHF
-                      {game.ricardo_bids !== null && game.ricardo_bids > 0 && (
-                        <span className="top-table__bids"> ({game.ricardo_bids})</span>
-                      )}
-                    </a>
-                  ) : (
-                    <span style={{ color: "var(--text-secondary)" }}>-</span>
+                <td>
+                  <a href={d.listing_url} target="_blank" rel="noopener noreferrer">
+                    <span className={`tag tag--source tag--${d.listing_source}`}>
+                      {d.listing_source}
+                    </span>
+                  </a>
+                  {d.bid_count > 0 && (
+                    <span style={{ fontSize: "0.7rem", color: "var(--text-secondary)", marginLeft: 4 }}>
+                      {d.bid_count} ench.
+                    </span>
                   )}
                 </td>
               </tr>
