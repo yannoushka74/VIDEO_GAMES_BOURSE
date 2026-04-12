@@ -246,7 +246,7 @@ def opportunities(request):
         "saturn": "pal-sega-saturn",
         "neo": "pal-neo-geo",
         "ps1": "pal-playstation",
-        "dreamcast": "pal-dreamcast",
+        "dreamcast": "pal-sega-dreamcast",
     }
 
     # Subqueries pour le dernier prix PriceCharting par jeu ET par console
