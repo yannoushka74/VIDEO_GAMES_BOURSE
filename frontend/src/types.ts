@@ -103,9 +103,12 @@ export interface Opportunity {
   listing_price_chf: number;
   listing_price_eur: number;
   listing_price_usd: number;
+  listing_currency: string;
+  listing_condition: string;
+  listing_source: string;
   bid_count: number;
   ends_at: string | null;
-  ref_source: "cib" | "loose";
+  ref_source: "cib" | "loose" | "new" | "graded";
   ref_price_usd: number;
   discount_percent: number;
 }
