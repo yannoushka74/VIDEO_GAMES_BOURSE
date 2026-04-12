@@ -186,6 +186,8 @@ ACCESSORY_TOKENS_STRONG = {
     "buch", "book", "livre", "artbook", "guidebook",
     # Notices / manuels seuls (mots sans ambiguïté)
     "bedienungsanleitung",
+    # Jaquettes / inserts (jamais un jeu)
+    "jaquette", "insert", "inlay",
     # Jouets / collection / cartes
     "lego", "moc", "playmobil", "figurine", "figurines", "amiibo",
     "tcg", "booster", "boosters", "ccg",
@@ -288,6 +290,21 @@ ACCESSORY_PHRASES = (
     "neuf sans blister",
     "neu ohne folie",
     "new without",
+    # Jaquettes / boîtes vides / disques seuls
+    "jaquette avant",
+    "jaquette arriere",
+    "jaquette seule",
+    "boite vide",
+    "boitier vide",
+    "empty box",
+    "box only",
+    "nur box",
+    "nur ovp",
+    "cd seul",
+    "disc seul",
+    "disk only",
+    "disc only",
+    "cd only",
     # Accessoires spécifiques
     "super game boy",
     "game boy player",
