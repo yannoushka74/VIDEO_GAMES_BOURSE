@@ -54,14 +54,8 @@ class Command(BaseCommand):
         # Charger le scraper (pour les clés .env)
         scraper = EbayScraper(delay=options["delay"])
 
-        # Sélection des jeux (PAL-vérifiés par défaut pour économiser les appels API)
-        has_pc = Exists(Price.objects.filter(game=OuterRef("pk"), source="pricecharting"))
-        has_ricardo = Exists(Listing.objects.filter(game=OuterRef("pk"), source="ricardo"))
+        # Sélection des jeux — tous les jeux rétro (sous le quota eBay 5000/jour)
         base_qs = Game.objects.filter(machines__slug__in=RETRO_SLUGS).distinct()
-
-        if not options.get("include_unverified"):
-            base_qs = base_qs.annotate(has_pc=has_pc, has_ricardo=has_ricardo)
-            base_qs = base_qs.filter(Q(pal_status="pal") | Q(has_pc=True) | Q(has_ricardo=True))
 
         if options["platform"]:
             slugs = [p.strip().lower() for p in options["platform"].split(",")]
