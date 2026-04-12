@@ -328,7 +328,7 @@ def opportunities(request):
             "listing_price_chf": round(listing_chf, 2),
             "listing_price_eur": round(listing_eur, 2),
             "listing_price_usd": round(listing_usd, 2),
-            "listing_currency": listing_currency,
+            "listing_currency": cur,
             "listing_condition": condition,
             "listing_source": listing.source,
             "bid_count": listing.bid_count,
