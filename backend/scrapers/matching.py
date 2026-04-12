@@ -414,9 +414,11 @@ CIB_KEYWORDS = re.compile(
 )
 
 # Mots-clés indiquant un jeu NEUF / SCELLÉ
+# Note : "new" seul est trop ambigu (= "newly listed" sur eBay), on ne garde
+# que les variantes explicites (sealed, blister, factory sealed, brand new).
 NEW_KEYWORDS = re.compile(
     r"\b(sealed|scelle|scellé|factory sealed|blister|"
-    r"neuf|neu|neuware|neuwertig|new|mint|brand new|"
+    r"neuf sous|neuf scelle|neuware|brand new|"
     r"sous blister|still sealed|unopened|non ouvert)\b",
     re.IGNORECASE,
 )
@@ -454,8 +456,10 @@ def detect_condition(title: str, ebay_condition: str = "") -> str:
         return "loose"
 
     # Mapping conditions eBay API → notre nomenclature
+    # "New" seul dans l'API eBay n'est PAS fiable pour les jeux rétro
+    # (souvent = "newly listed", pas "sealed"). Seul "Brand New" compte.
     ebay_lower = ebay_condition.lower()
-    if "new" in ebay_lower or "brand new" in ebay_lower:
+    if "brand new" in ebay_lower:
         return "new"
     if "very good" in ebay_lower or "like new" in ebay_lower:
         return "cib"  # Very Good sur eBay = souvent complet
