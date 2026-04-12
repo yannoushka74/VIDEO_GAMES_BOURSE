@@ -184,6 +184,8 @@ ACCESSORY_TOKENS_STRONG = {
     "dvd", "bluray", "vhs", "vinyl", "lp",
     "soundtrack", "ost",
     "buch", "book", "livre", "artbook", "guidebook",
+    # Notices / manuels seuls (mots sans ambiguïté)
+    "bedienungsanleitung",
     # Jouets / collection / cartes
     "lego", "moc", "playmobil", "figurine", "figurines", "amiibo",
     "tcg", "booster", "boosters", "ccg",
@@ -272,9 +274,20 @@ ACCESSORY_PHRASES = (
     "only manual",
     "manual only",
     "notice seule",
+    "notice pour",
+    "notice de ",
+    "notice du ",
     "instruction booklet",
     "origspielanleitung",
     "original anleitung",
+    "pas de jeu",
+    "ohne spiel",
+    "no game",
+    "sans jeu",
+    # Neuf sans blister = ouvert, pas sealed
+    "neuf sans blister",
+    "neu ohne folie",
+    "new without",
     # Accessoires spécifiques
     "super game boy",
     "game boy player",
@@ -448,6 +461,10 @@ def detect_condition(title: str, ebay_condition: str = "") -> str:
 
     if GRADED_KEYWORDS.search(combined):
         return "graded"
+    # "neuf sans blister" / "neu ohne folie" = ouvert, pas sealed → cib
+    low = combined.lower()
+    if "neuf sans" in low or "neu ohne" in low or "new without" in low:
+        return "cib"
     if NEW_KEYWORDS.search(combined):
         return "new"
     if CIB_KEYWORDS.search(combined):
@@ -569,6 +586,20 @@ def is_likely_accessory(title: str) -> bool:
     weak_hits = sum(1 for t in useful if t in ACCESSORY_TOKENS_WEAK)
     if weak_hits and weak_hits >= len(useful) * 0.5:
         return True
+
+    # Détection "notice seule" / "manual only" :
+    # Si le titre contient "notice" / "anleitung" / "manual" / "booklet"
+    # MAIS PAS de contexte "complet" (mit anleitung, avec notice, complete),
+    # c'est probablement un manuel vendu séparément.
+    manual_words = ("notice", "anleitung", "booklet", "handbuch", "instruction", "manual")
+    complete_context = (
+        "komplett", "complete", "complet", "cib",
+        "mit anleitung", "avec notice", "with manual",
+        "mit ovp", "avec boite", "in box", "boxed",
+    )
+    if any(w in norm for w in manual_words):
+        if not any(c in norm for c in complete_context):
+            return True
 
     return False
 
