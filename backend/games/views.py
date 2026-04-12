@@ -236,7 +236,23 @@ def opportunities(request):
     chf_eur = get_rate("CHF", "EUR") or 1.09
     usd_eur = get_rate("USD", "EUR") or 0.86
 
-    # Subqueries pour le dernier prix PriceCharting par jeu
+    # Mapping platform_slug → substring dans l'URL PriceCharting product_url
+    # Ex: platform_slug="saturn" → product_url contient "pal-sega-saturn"
+    SLUG_TO_PC_URL = {
+        "snes": "pal-super-nintendo",
+        "nes": "pal-nes",
+        "n64": "pal-nintendo-64",
+        "gba": "pal-gameboy-advance",
+        "saturn": "pal-sega-saturn",
+        "neo": "pal-neo-geo",
+        "ps1": "pal-playstation",
+        "dreamcast": "pal-dreamcast",
+    }
+
+    # Subqueries pour le dernier prix PriceCharting par jeu ET par console
+    # On filtre sur product_url contenant le slug de la console du listing.
+    # OuterRef("platform_slug") n'est pas directement utilisable dans Contains,
+    # donc on fait le filtrage en Python après.
     latest_pc_loose = Subquery(
         Price.objects.filter(game=OuterRef("game_id"), source="pricecharting")
         .order_by("-scraped_at").values("price")[:1]
@@ -253,6 +269,11 @@ def opportunities(request):
         Price.objects.filter(game=OuterRef("game_id"), source="pricecharting")
         .order_by("-scraped_at").values("graded_price")[:1]
     )
+    # Aussi récupérer le product_url pour vérifier la console
+    latest_pc_url = Subquery(
+        Price.objects.filter(game=OuterRef("game_id"), source="pricecharting")
+        .order_by("-scraped_at").values("product_url")[:1]
+    )
 
     qs = (
         Listing.objects.filter(
@@ -265,6 +286,7 @@ def opportunities(request):
             pc_cib=latest_pc_cib,
             pc_new=latest_pc_new,
             pc_graded=latest_pc_graded,
+            pc_url=latest_pc_url,
         )
         .filter(pc_loose__isnull=False)  # uniquement les jeux avec cote
         .select_related("game")
@@ -277,6 +299,28 @@ def opportunities(request):
 
     results = []
     for listing in qs.iterator():
+        # Vérifier que la cote PriceCharting correspond à la MÊME console que le listing.
+        # Sinon on compare Saturn à PS1 pour un jeu multi-plateforme (bug Courier Crisis).
+        pc_url = listing.pc_url or ""
+        expected_url_part = SLUG_TO_PC_URL.get(listing.platform_slug, "")
+        if expected_url_part and expected_url_part not in pc_url:
+            # La cote est pour une autre console → chercher la bonne cote
+            matching_price = (
+                Price.objects.filter(
+                    game_id=listing.game_id,
+                    source="pricecharting",
+                    product_url__contains=expected_url_part,
+                )
+                .order_by("-scraped_at")
+                .first()
+            )
+            if not matching_price:
+                continue  # pas de cote pour cette console
+            listing.pc_loose = matching_price.price
+            listing.pc_cib = matching_price.cib_price
+            listing.pc_new = matching_price.new_price
+            listing.pc_graded = matching_price.graded_price
+
         condition = listing.condition or "loose"
         if condition == "cib" and listing.pc_cib:
             ref_usd = float(listing.pc_cib)
