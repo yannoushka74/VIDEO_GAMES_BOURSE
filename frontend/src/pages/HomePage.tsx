@@ -15,14 +15,14 @@ const PLATFORMS = [
   { value: "dreamcast", label: "Dreamcast" },
 ];
 
-function formatUSD(value: string | null) {
+function formatCHF(value: string | null) {
   if (!value) return "-";
-  return `$${parseFloat(value).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
+  return `${parseFloat(value).toLocaleString("fr-CH", { minimumFractionDigits: 0, maximumFractionDigits: 0 })} CHF`;
 }
 
-function formatCHF(value: string | null) {
+function formatUSD(value: string | null) {
   if (!value) return "";
-  return `${parseFloat(value).toLocaleString("fr-CH", { minimumFractionDigits: 0, maximumFractionDigits: 0 })} CHF`;
+  return `$${parseFloat(value).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 }
 
 function HomePage() {
@@ -135,27 +135,29 @@ function HomePage() {
                   </div>
                 </td>
                 <td className="top-table__price top-table__price--loose">
-                  {formatUSD(game.loose_price)}
-                  {game.loose_price_chf && (
-                    <span style={{ display: "block", color: "var(--text-secondary)", fontSize: "0.75rem" }}>
-                      {formatCHF(game.loose_price_chf)}
-                    </span>
-                  )}
+                  {formatCHF(game.loose_price_chf)}
+                  <span style={{ display: "block", color: "var(--text-secondary)", fontSize: "0.75rem" }}>
+                    {formatUSD(game.loose_price)}
+                  </span>
                 </td>
                 <td className="top-table__price">
-                  {formatUSD(game.cib_price)}
-                  {game.cib_price_chf && (
+                  {formatCHF(game.cib_price_chf)}
+                  {game.cib_price && (
                     <span style={{ display: "block", color: "var(--text-secondary)", fontSize: "0.75rem" }}>
-                      {formatCHF(game.cib_price_chf)}
+                      {formatUSD(game.cib_price)}
                     </span>
                   )}
                 </td>
-                <td className="top-table__price top-table__price--new">{formatUSD(game.new_price)}</td>
-                <td className="top-table__price top-table__price--graded">{formatUSD(game.graded_price)}</td>
+                <td className="top-table__price top-table__price--new">
+                  {formatCHF(game.new_price_chf)}
+                </td>
+                <td className="top-table__price top-table__price--graded">
+                  {game.graded_price ? formatUSD(game.graded_price) : "-"}
+                </td>
                 <td className="top-table__price top-table__price--ricardo">
                   {game.ricardo_price ? (
                     <a href={game.ricardo_url || "#"} target="_blank" rel="noopener noreferrer">
-                      CHF {parseFloat(game.ricardo_price).toFixed(2)}
+                      {parseFloat(game.ricardo_price).toFixed(0)} CHF
                       {game.ricardo_bids !== null && game.ricardo_bids > 0 && (
                         <span className="top-table__bids"> ({game.ricardo_bids})</span>
                       )}
