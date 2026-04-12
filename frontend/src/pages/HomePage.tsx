@@ -11,6 +11,8 @@ const PLATFORMS = [
   { value: "n64", label: "N64" },
   { value: "gba", label: "GBA" },
   { value: "saturn", label: "Saturn" },
+  { value: "ps1", label: "PlayStation" },
+  { value: "dreamcast", label: "Dreamcast" },
 ];
 
 function formatUSD(value: string | null) {
