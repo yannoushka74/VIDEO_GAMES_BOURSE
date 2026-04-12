@@ -312,13 +312,14 @@ def opportunities(request):
         if discount_pct < min_discount:
             continue
 
-        machines = [m.name for m in game.machines.all() if m.slug in RETRO_SLUGS]
+        g = listing.game
+        machines = [m.name for m in g.machines.all() if m.slug in RETRO_SLUGS]
 
         results.append({
             "listing_id": listing.id,
-            "game_id": game.id,
-            "title": game.title,
-            "cover_url": game.cover_url,
+            "game_id": g.id,
+            "title": g.title,
+            "cover_url": g.cover_url,
             "machines": machines,
             "platform_slug": listing.platform_slug,
             "listing_title": listing.title,
