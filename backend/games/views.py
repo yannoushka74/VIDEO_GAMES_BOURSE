@@ -280,6 +280,7 @@ def opportunities(request):
             source__in=["ricardo", "ebay"],
             game__isnull=False,
             current_price__gte=5,
+            region__in=["PAL", "unknown", ""],  # exclure JP et NTSC (cotes PAL only)
         )
         .annotate(
             pc_loose=latest_pc_loose,
