@@ -222,83 +222,91 @@ def exchange_rates(request):
 
 @api_view(["GET"])
 def opportunities(request):
-    """Annonces Ricardo où le prix CHF (converti USD) est sous la cote PriceCharting.
+    """Annonces Ricardo/eBay sous la cote PriceCharting.
 
-    Filtrable par plateforme via ?platform=snes et limite via ?limit=100.
-    Tri par décote décroissante.
+    Optimisé : une seule requête SQL avec annotations au lieu de N+1.
     """
     limit = min(int(request.query_params.get("limit", 100)), 500)
     platform = request.query_params.get("platform", "")
     min_discount = float(request.query_params.get("min_discount", 20))  # %
-
-    # On ne garde que les listings liés à un jeu (game_id non nul).
-    # On exclut aussi les prix < 5 (mises de départ d'enchères, non représentatives).
-    # Inclut Ricardo ET eBay.
     source_filter = request.query_params.get("source", "")
-    listings_qs = (
+
+    from .exchange import get_rate
+    usd_chf = get_rate("USD", "CHF") or 0.79
+    chf_eur = get_rate("CHF", "EUR") or 1.09
+    usd_eur = get_rate("USD", "EUR") or 0.86
+
+    # Subqueries pour le dernier prix PriceCharting par jeu
+    latest_pc_loose = Subquery(
+        Price.objects.filter(game=OuterRef("game_id"), source="pricecharting")
+        .order_by("-scraped_at").values("price")[:1]
+    )
+    latest_pc_cib = Subquery(
+        Price.objects.filter(game=OuterRef("game_id"), source="pricecharting")
+        .order_by("-scraped_at").values("cib_price")[:1]
+    )
+    latest_pc_new = Subquery(
+        Price.objects.filter(game=OuterRef("game_id"), source="pricecharting")
+        .order_by("-scraped_at").values("new_price")[:1]
+    )
+    latest_pc_graded = Subquery(
+        Price.objects.filter(game=OuterRef("game_id"), source="pricecharting")
+        .order_by("-scraped_at").values("graded_price")[:1]
+    )
+
+    qs = (
         Listing.objects.filter(
             source__in=["ricardo", "ebay"],
             game__isnull=False,
             current_price__gte=5,
         )
+        .annotate(
+            pc_loose=latest_pc_loose,
+            pc_cib=latest_pc_cib,
+            pc_new=latest_pc_new,
+            pc_graded=latest_pc_graded,
+        )
+        .filter(pc_loose__isnull=False)  # uniquement les jeux avec cote
         .select_related("game")
-        .prefetch_related("game__machines", "game__prices")
+        .prefetch_related("game__machines")
     )
     if source_filter:
-        listings_qs = listings_qs.filter(source=source_filter)
+        qs = qs.filter(source=source_filter)
     if platform:
-        listings_qs = listings_qs.filter(platform_slug=platform)
+        qs = qs.filter(platform_slug=platform)
 
     results = []
-    for listing in listings_qs.iterator():
-        game = listing.game
-        pc = game.prices.filter(source="pricecharting").order_by("-scraped_at").first()
-        if not pc:
-            continue
-
-        # Comparer condition par condition :
-        # - listing 'cib' → comparer à pc.cib_price
-        # - listing 'new' → comparer à pc.new_price
-        # - listing 'graded' → comparer à pc.graded_price
-        # - listing 'loose' ou vide → comparer à pc.price (loose)
+    for listing in qs.iterator():
         condition = listing.condition or "loose"
-        if condition == "cib" and pc.cib_price:
-            ref_usd = float(pc.cib_price)
+        if condition == "cib" and listing.pc_cib:
+            ref_usd = float(listing.pc_cib)
             ref_source = "cib"
-        elif condition == "new" and pc.new_price:
-            ref_usd = float(pc.new_price)
+        elif condition == "new" and listing.pc_new:
+            ref_usd = float(listing.pc_new)
             ref_source = "new"
-        elif condition == "graded" and pc.graded_price:
-            ref_usd = float(pc.graded_price)
+        elif condition == "graded" and listing.pc_graded:
+            ref_usd = float(listing.pc_graded)
             ref_source = "graded"
         else:
-            ref_usd = float(pc.price)
+            ref_usd = float(listing.pc_loose)
             ref_source = "loose"
         if ref_usd <= 0:
             continue
 
-        # Prix de référence : achat direct si dispo (prix ferme), sinon current_price
-        if listing.buy_now_price:
-            price_chf = float(listing.buy_now_price)
+        raw_price = float(listing.buy_now_price or listing.current_price)
+        cur = listing.currency
+        if cur == "CHF":
+            listing_chf = raw_price
+            listing_usd = round(raw_price / usd_chf, 2)
+            listing_eur = round(raw_price * chf_eur, 2)
+        elif cur == "EUR":
+            listing_eur = raw_price
+            listing_usd = round(raw_price / usd_eur, 2)
+            listing_chf = round(raw_price / chf_eur, 2)
         else:
-            price_chf = float(listing.current_price)
-
-        # Convertir en USD pour comparaison
-        listing_currency = listing.currency
-        if listing_currency == "CHF":
-            listing_usd = chf_to_usd(price_chf)
-            listing_eur = chf_to_eur(price_chf)
-            listing_chf = price_chf
-        elif listing_currency == "EUR":
-            from .exchange import get_rate
-            eur_to_usd = 1 / (get_rate("USD", "EUR") or 0.86)
-            listing_usd = round(price_chf * eur_to_usd, 2)
-            listing_eur = price_chf
-            listing_chf = round(price_chf / (get_rate("CHF", "EUR") or 1.09), 2)
-        else:
-            listing_usd = price_chf
-            listing_eur = round(price_chf * (get_rate("USD", "EUR") or 0.86), 2)
-            listing_chf = round(price_chf * (get_rate("USD", "CHF") or 0.79), 2)
+            listing_usd = raw_price
+            listing_chf = round(raw_price * usd_chf, 2)
+            listing_eur = round(raw_price * usd_eur, 2)
 
         discount_pct = (1 - listing_usd / ref_usd) * 100
         if discount_pct < min_discount:
