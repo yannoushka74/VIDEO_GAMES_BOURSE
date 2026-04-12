@@ -18,6 +18,7 @@ from urllib.parse import unquote
 
 from botasaurus.browser import browser, Driver
 from botasaurus.soupify import soupify
+from scrapers.matching import detect_condition
 
 logger = logging.getLogger(__name__)
 
@@ -183,6 +184,7 @@ def _extract_listing_from_card(link_el) -> dict | None:
         "buy_now_price": buy_now_price,
         "bid_count": bid_count,
         "region": region,
+        "condition": detect_condition(title),
     }
 
 

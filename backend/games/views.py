@@ -232,28 +232,48 @@ def opportunities(request):
     min_discount = float(request.query_params.get("min_discount", 20))  # %
 
     # On ne garde que les listings liés à un jeu (game_id non nul).
-    # On exclut aussi les prix < 5 CHF (mises de départ d'enchères, non représentatives).
+    # On exclut aussi les prix < 5 (mises de départ d'enchères, non représentatives).
+    # Inclut Ricardo ET eBay.
+    source_filter = request.query_params.get("source", "")
     listings_qs = (
         Listing.objects.filter(
-            source="ricardo",
+            source__in=["ricardo", "ebay"],
             game__isnull=False,
             current_price__gte=5,
         )
         .select_related("game")
         .prefetch_related("game__machines", "game__prices")
     )
+    if source_filter:
+        listings_qs = listings_qs.filter(source=source_filter)
     if platform:
         listings_qs = listings_qs.filter(platform_slug=platform)
 
     results = []
     for listing in listings_qs.iterator():
         game = listing.game
-        # Cote PriceCharting la plus récente (loose comme référence)
         pc = game.prices.filter(source="pricecharting").order_by("-scraped_at").first()
         if not pc:
             continue
-        # Référence : cib_price si dispo, sinon loose
-        ref_usd = float(pc.cib_price) if pc.cib_price else float(pc.price)
+
+        # Comparer condition par condition :
+        # - listing 'cib' → comparer à pc.cib_price
+        # - listing 'new' → comparer à pc.new_price
+        # - listing 'graded' → comparer à pc.graded_price
+        # - listing 'loose' ou vide → comparer à pc.price (loose)
+        condition = listing.condition or "loose"
+        if condition == "cib" and pc.cib_price:
+            ref_usd = float(pc.cib_price)
+            ref_source = "cib"
+        elif condition == "new" and pc.new_price:
+            ref_usd = float(pc.new_price)
+            ref_source = "new"
+        elif condition == "graded" and pc.graded_price:
+            ref_usd = float(pc.graded_price)
+            ref_source = "graded"
+        else:
+            ref_usd = float(pc.price)
+            ref_source = "loose"
         if ref_usd <= 0:
             continue
 
@@ -262,9 +282,23 @@ def opportunities(request):
             price_chf = float(listing.buy_now_price)
         else:
             price_chf = float(listing.current_price)
-        listing_chf = price_chf
-        listing_usd = chf_to_usd(listing_chf)
-        listing_eur = chf_to_eur(listing_chf)
+
+        # Convertir en USD pour comparaison
+        listing_currency = listing.currency
+        if listing_currency == "CHF":
+            listing_usd = chf_to_usd(price_chf)
+            listing_eur = chf_to_eur(price_chf)
+            listing_chf = price_chf
+        elif listing_currency == "EUR":
+            from .exchange import get_rate
+            eur_to_usd = 1 / (get_rate("USD", "EUR") or 0.86)
+            listing_usd = round(price_chf * eur_to_usd, 2)
+            listing_eur = price_chf
+            listing_chf = round(price_chf / (get_rate("CHF", "EUR") or 1.09), 2)
+        else:
+            listing_usd = price_chf
+            listing_eur = round(price_chf * (get_rate("USD", "EUR") or 0.86), 2)
+            listing_chf = round(price_chf * (get_rate("USD", "CHF") or 0.79), 2)
 
         discount_pct = (1 - listing_usd / ref_usd) * 100
         if discount_pct < min_discount:
@@ -285,9 +319,12 @@ def opportunities(request):
             "listing_price_chf": round(listing_chf, 2),
             "listing_price_eur": round(listing_eur, 2),
             "listing_price_usd": round(listing_usd, 2),
+            "listing_currency": listing_currency,
+            "listing_condition": condition,
+            "listing_source": listing.source,
             "bid_count": listing.bid_count,
             "ends_at": listing.ends_at.isoformat() if listing.ends_at else None,
-            "ref_source": "cib" if pc.cib_price else "loose",
+            "ref_source": ref_source,
             "ref_price_usd": round(ref_usd, 2),
             "discount_percent": round(discount_pct, 1),
         })

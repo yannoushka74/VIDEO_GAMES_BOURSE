@@ -19,7 +19,7 @@ from django.core.management.base import BaseCommand
 from django.db.models import Exists, OuterRef, Q
 
 from scrapers.ebay import EbayScraper, search_ebay, detect_region
-from scrapers.matching import is_likely_accessory
+from scrapers.matching import detect_condition, is_likely_accessory
 from games.models import Game, Listing, Price
 
 RETRO_SLUGS = {"neo", "nes", "snes", "gba", "saturn", "n64", "ps1", "dreamcast"}
@@ -126,6 +126,7 @@ class Command(BaseCommand):
                     skipped += 1
                     continue
                 region = detect_region(item["title"])
+                condition = detect_condition(item["title"], item.get("condition", ""))
                 # Éviter les doublons (même URL)
                 if Listing.objects.filter(source=Listing.Source.EBAY, listing_url=item["listing_url"]).exists():
                     continue
@@ -140,7 +141,7 @@ class Command(BaseCommand):
                     buy_now_price=None,
                     currency=item["currency"],
                     bid_count=item.get("bid_count", 0),
-                    condition=item.get("condition", ""),
+                    condition=condition,
                     region=region,
                 )
                 count += 1

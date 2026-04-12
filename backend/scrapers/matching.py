@@ -401,6 +401,70 @@ BUNDLE_PHRASES = (
 
 DEFAULT_THRESHOLD = 70
 
+# --- Détection de condition (loose / cib / new / graded) ---
+
+# Mots-clés indiquant un jeu COMPLET en boîte (CIB)
+CIB_KEYWORDS = re.compile(
+    r"\b(cib|complet|komplett|complete|vollstandig|vollständig|"
+    r"mit ovp|avec boite|avec boîte|in ovp|in box|boxed|"
+    r"originalverpackung|originalverpackt|"
+    r"mit anleitung|avec notice|with manual|"
+    r"big box)\b",
+    re.IGNORECASE,
+)
+
+# Mots-clés indiquant un jeu NEUF / SCELLÉ
+NEW_KEYWORDS = re.compile(
+    r"\b(sealed|scelle|scellé|factory sealed|blister|"
+    r"neuf|neu|neuware|neuwertig|new|mint|brand new|"
+    r"sous blister|still sealed|unopened|non ouvert)\b",
+    re.IGNORECASE,
+)
+
+# Mots-clés indiquant un jeu GRADÉ
+GRADED_KEYWORDS = re.compile(
+    r"\b(graded|wata|vga|cgc|ukg|\d+\.?\d*\s*/\s*10)\b",
+    re.IGNORECASE,
+)
+
+# Mots-clés indiquant explicitement LOOSE
+LOOSE_KEYWORDS = re.compile(
+    r"\b(loose|modul|cartouche|cartridge|cart only|"
+    r"nur modul|nur spiel|nur cartridge|game only|"
+    r"ohne ovp|sans boite|sans boîte|no box|unboxed)\b",
+    re.IGNORECASE,
+)
+
+
+def detect_condition(title: str, ebay_condition: str = "") -> str:
+    """Détecte la condition d'un listing à partir du titre et/ou du champ eBay.
+
+    Retourne : 'graded', 'new', 'cib', 'loose'
+    Ordre de priorité : graded > new > cib > loose (défaut)
+    """
+    combined = f"{title} {ebay_condition}"
+
+    if GRADED_KEYWORDS.search(combined):
+        return "graded"
+    if NEW_KEYWORDS.search(combined):
+        return "new"
+    if CIB_KEYWORDS.search(combined):
+        return "cib"
+    if LOOSE_KEYWORDS.search(combined):
+        return "loose"
+
+    # Mapping conditions eBay API → notre nomenclature
+    ebay_lower = ebay_condition.lower()
+    if "new" in ebay_lower or "brand new" in ebay_lower:
+        return "new"
+    if "very good" in ebay_lower or "like new" in ebay_lower:
+        return "cib"  # Very Good sur eBay = souvent complet
+    if "good" in ebay_lower or "acceptable" in ebay_lower:
+        return "loose"  # Good/Acceptable = souvent loose
+
+    # Défaut : loose
+    return "loose"
+
 
 def _strip_accents(text: str) -> str:
     nfkd = unicodedata.normalize("NFKD", text)

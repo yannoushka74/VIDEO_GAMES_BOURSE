@@ -88,6 +88,7 @@ class Command(BaseCommand):
                     bid_count=r.get("bid_count", 0),
                     ends_at=None,
                     region=r.get("region", "PAL"),
+                    condition=r.get("condition", "loose"),
                 )
 
                 if game:
