@@ -69,19 +69,40 @@ print(cur.fetchone())
 
 Composants : `Navbar`, `GameCard`, `Pagination`, `SearchAutocomplete`, `PriceChartingIcon`, `PriceHistoryChart`.
 
-## Tests
+## Alertes prix (Telegram)
 
-Tests unitaires du module de matching annonce → jeu :
+Système de wishlist : être notifié quand une annonce Ricardo/eBay passe sous un prix cible pour un jeu précis.
 
+**Modèles** : `Alert` (game, max_price, currency, sources, label, is_active), `AlertNotification` (dédup `(alert, listing)`).
+
+**API** : `GET/POST/PATCH/DELETE /api/alerts/` (CRUD, pas d'auth — single-user).
+
+**Commande** :
 ```bash
-cd backend && python manage.py test scrapers
-# ou sans Django :
-cd backend && python -m unittest scrapers.tests -v
+python manage.py check_alerts                # scan + notif Telegram
+python manage.py check_alerts --dry-run      # preview, rien envoyé
+python manage.py check_alerts --alert 42     # cibler une alerte
+python manage.py check_alerts --window-hours 24
 ```
 
-Couverture : `normalize`, `extract_numbers`, `clean_tokens`, `is_likely_accessory`, `is_alien_platform_listing`, `has_game_indicator`, `detect_condition`, `match_listing_title` + tests de régression sur les bugs historiques (Shinobi NES↔Saturn X, notice seule, jaquette, "neuf sans blister").
+Planifier via cron/Airflow toutes les 15 min.
 
-Le reste du backend n'a pas (encore) de tests.
+**Config Telegram** : variables d'env `TELEGRAM_BOT_TOKEN` et `TELEGRAM_CHAT_ID`. Sans elles, le scan fonctionne (match + dédup en DB) mais log juste en warning.
+
+**Dédup** : `AlertNotification` a un `UniqueConstraint(alert, listing)` — chaque listing n'est notifié qu'une fois par alerte.
+
+## Tests
+
+Tests unitaires (85 tests total, runnables sans DB ni Django) :
+
+```bash
+cd backend && python manage.py test scrapers games
+# ou sans Django :
+cd backend && python -m unittest scrapers.tests games.tests -v
+```
+
+- **`scrapers/tests.py`** (66 tests) — couvre `normalize`, `extract_numbers`, `clean_tokens`, `is_likely_accessory`, `is_alien_platform_listing`, `has_game_indicator`, `detect_condition`, `match_listing_title` + régressions (Shinobi NES↔Saturn X, notice seule, jaquette, "neuf sans blister").
+- **`games/tests.py`** (19 tests) — logique des alertes prix : `convert_price`, `effective_listing_price`, `listing_triggers_alert` (avec mocks sur `get_rate`), `format_notification_text`.
 
 ## Pièges connus / Gotchas
 

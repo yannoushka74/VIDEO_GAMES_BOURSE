@@ -1,7 +1,7 @@
 from rest_framework import serializers
 
 from .exchange import usd_to_chf
-from .models import Game, Genre, Listing, Machine, Price
+from .models import Alert, Game, Genre, Listing, Machine, Price
 
 
 class MachineSerializer(serializers.ModelSerializer):
@@ -120,3 +120,21 @@ class GameDetailSerializer(serializers.ModelSerializer):
             if price.source not in seen:
                 seen[price.source] = price
         return PriceSerializer(seen.values(), many=True).data
+
+
+class AlertSerializer(serializers.ModelSerializer):
+    game_title = serializers.CharField(source="game.title", read_only=True)
+    game_cover_url = serializers.CharField(source="game.cover_url", read_only=True)
+    notification_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Alert
+        fields = [
+            "id", "game", "game_title", "game_cover_url",
+            "max_price", "currency", "sources", "label", "is_active",
+            "notification_count", "created_at", "updated_at",
+        ]
+        read_only_fields = ["created_at", "updated_at"]
+
+    def get_notification_count(self, obj):
+        return obj.notifications.count()

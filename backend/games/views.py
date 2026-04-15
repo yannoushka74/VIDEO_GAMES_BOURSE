@@ -6,8 +6,9 @@ from rest_framework.response import Response
 from django.db.models import Exists, F, Max, OuterRef, Q, Subquery
 
 from .exchange import chf_to_eur, chf_to_usd, usd_to_chf
-from .models import Game, Genre, Listing, Machine, Price
+from .models import Alert, Game, Genre, Listing, Machine, Price
 from .serializers import (
+    AlertSerializer,
     GameDetailSerializer,
     GameListSerializer,
     GenreSerializer,
@@ -132,6 +133,15 @@ class GenreViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Genre.objects.all()
     serializer_class = GenreSerializer
     search_fields = ["name"]
+
+
+class AlertViewSet(viewsets.ModelViewSet):
+    """CRUD pour les alertes prix. Pas d'auth : un seul user (propriétaire du site)."""
+
+    queryset = Alert.objects.select_related("game").all()
+    serializer_class = AlertSerializer
+    filter_backends = [filters.DjangoFilterBackend]
+    filterset_fields = ["game", "is_active"]
 
 
 @api_view(["GET"])

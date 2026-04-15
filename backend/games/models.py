@@ -168,3 +168,57 @@ class Listing(models.Model):
 
     def __str__(self):
         return f"{self.title[:50]} - {self.current_price} {self.currency} ({self.source})"
+
+
+class Alert(models.Model):
+    """Watch utilisateur : notifier si une annonce pour un jeu passe sous un prix cible."""
+
+    class Currency(models.TextChoices):
+        CHF = "CHF", "CHF"
+        EUR = "EUR", "EUR"
+        USD = "USD", "USD"
+
+    game = models.ForeignKey(Game, on_delete=models.CASCADE, related_name="alerts")
+    max_price = models.DecimalField(max_digits=10, decimal_places=2)
+    currency = models.CharField(max_length=3, choices=Currency.choices, default=Currency.CHF)
+    sources = models.CharField(
+        max_length=100,
+        default="ricardo,ebay",
+        help_text="Sources autorisées séparées par virgule (ricardo,ebay,leboncoin)",
+    )
+    label = models.CharField(max_length=200, blank=True)
+    is_active = models.BooleanField(default=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["game", "is_active"]),
+        ]
+
+    def __str__(self):
+        return f"{self.game.title} <= {self.max_price} {self.currency}"
+
+    def allowed_sources(self) -> list[str]:
+        return [s.strip() for s in (self.sources or "").split(",") if s.strip()]
+
+
+class AlertNotification(models.Model):
+    """Trace d'une notification envoyée. Sert à dédupliquer."""
+
+    alert = models.ForeignKey(Alert, on_delete=models.CASCADE, related_name="notifications")
+    listing = models.ForeignKey(Listing, on_delete=models.CASCADE, related_name="alert_notifications")
+    price_at_notification = models.DecimalField(max_digits=10, decimal_places=2)
+    currency_at_notification = models.CharField(max_length=3)
+    notified_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-notified_at"]
+        constraints = [
+            models.UniqueConstraint(fields=["alert", "listing"], name="uniq_alert_listing"),
+        ]
+
+    def __str__(self):
+        return f"{self.alert} ← {self.listing}"
