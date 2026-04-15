@@ -1,6 +1,8 @@
 # Video Games Bourse
 
-Plateforme web de suivi des cotes de jeux vidéo rétro collector. Focus sur 6 consoles : Neo Geo, NES, SNES, GBA, Saturn, N64 (~3 282 jeux).
+Plateforme web de suivi des cotes de jeux vidéo rétro collector. Focus sur 8 consoles : Neo Geo, NES, SNES, GBA, Saturn, N64, PS1, Dreamcast.
+
+Source de vérité pour le scope : `RETRO_SLUGS` dans `backend/games/views.py`.
 
 ## Déploiement production (K3s)
 
@@ -58,6 +60,29 @@ print(cur.fetchone())
 "
 ```
 
+## Frontend pages (`frontend/src/pages/`)
+
+- **HomePage.tsx** — best deals Ricardo/eBay triés par décote vs cote PC. CHF primaire, USD secondaire.
+- **GamesPage.tsx** — liste paginée + filtres console/prix/recherche.
+- **GameDetailPage.tsx** — détail jeu, historique de cote (`PriceHistoryChart.tsx`), listings marketplace, liens PriceCharting.
+- **OpportunitiesPage.tsx** — annonces Ricardo/eBay sous-cotées vs cote PC (alimente `/api/opportunities/`).
+
+Composants : `Navbar`, `GameCard`, `Pagination`, `SearchAutocomplete`, `PriceChartingIcon`, `PriceHistoryChart`.
+
+## Tests
+
+Tests unitaires du module de matching annonce → jeu :
+
+```bash
+cd backend && python manage.py test scrapers
+# ou sans Django :
+cd backend && python -m unittest scrapers.tests -v
+```
+
+Couverture : `normalize`, `extract_numbers`, `clean_tokens`, `is_likely_accessory`, `is_alien_platform_listing`, `has_game_indicator`, `detect_condition`, `match_listing_title` + tests de régression sur les bugs historiques (Shinobi NES↔Saturn X, notice seule, jaquette, "neuf sans blister").
+
+Le reste du backend n'a pas (encore) de tests.
+
 ## Pièges connus / Gotchas
 
 - **Console matching** : tout match prix doit être strictement filtré sur la console du jeu d'origine. Sinon NES Shinobi → Saturn Shinobi X (bug fixé 2026-04-09, 188 mauvais prix supprimés).
@@ -66,6 +91,7 @@ print(cur.fetchone())
 - **Titres FR vs EN** : JVC en français, PriceCharting en anglais. Utiliser `title_en` (rempli par DAG IGDB) pour la recherche quand dispo.
 - **`title_en` est NOT NULL** : utiliser `''` pour vider, pas `NULL`.
 - **Scrapers Airflow** : le code de scraping productif est dans le repo `airflow-local-setup` (DAGs), PAS dans ce repo. Les `*_scraper.py` ici sont les versions originales en management commands.
+- **Module matching dans `scrapers/`, pas `games/`** : `backend/scrapers/matching.py` (705 lignes). Tout changement impactant doit passer les tests `scrapers.tests` sous peine de régresser le match-rate (référence ~72% sur Ricardo).
 - **Frontend `m.slug`** : le filtre machine doit utiliser `m.slug` pas `m.jvc_id`.
 - **Filtre PAL par défaut** : `_retro_games_qs()` exclut par défaut `pal_status='not_pal'` ET ne garde que les jeux ayant une preuve PAL (`pal_status='pal'` OR cote PriceCharting OR annonce Ricardo). `?include_unverified=true` désactive le filtre. Sur la page détail (`retrieve`), le filtre est bypassé pour autoriser les liens directs.
 - **Ricardo URL** : utiliser `%20` (pas `+`) pour encoder les espaces dans les query Ricardo, sinon résultats vides.
@@ -123,14 +149,18 @@ VIDEO_GAMES_BOURSE/
 
 ## Consoles ciblées
 
-| Plateforme | Slug | Jeux | Cote marché |
-|-----------|------|------|-------------|
-| Neo Geo | neo | 134 | 500€ – 13 000€ |
-| NES | nes | 762 | 300€ – 5 000€ |
-| SNES | snes | 821 | 200€ – 3 000€ |
-| GBA | gba | 1 014 | 100€ – 1 500€ |
-| Saturn | saturn | 419 | 200€ – 1 000€ |
-| N64 | n64 | 347 | 150€ – 500€ |
+| Plateforme | Slug |
+|-----------|------|
+| Neo Geo | neo |
+| NES | nes |
+| SNES | snes |
+| GBA | gba |
+| Saturn | saturn |
+| N64 | n64 |
+| PlayStation 1 | ps1 |
+| Dreamcast | dreamcast |
+
+PS1 et Dreamcast ont été ajoutés après la v1 initiale. Toute nouvelle console doit être ajoutée dans `RETRO_SLUGS` (`backend/games/views.py`) et dans `SLUG_TO_PC_URL` (mapping PriceCharting) ainsi que dans `ACCEPTED_PLATFORM_PHRASES` de `scrapers/matching.py`.
 
 ## Lancement
 
@@ -155,31 +185,29 @@ npm install --cache /tmp/npm-cache-vgb
 npm run dev
 ```
 
-## Sources de prix
+## Sources de données actives
 
-### PriceCharting (cotes collector, USD)
-```bash
-python manage.py scrape_prices --source pricecharting --platform snes --limit 100
-python manage.py scrape_prices --source pricecharting --platform snes,nes,n64,neo,gba,saturn --all --delay 1
-```
-Mode `@request` (pas de Chrome, ~1.5s/jeu). Retourne : loose, CIB, neuf, gradé, boîte seule, manuel seul.
+**Actives en prod** :
+1. **jeuxvideo.com (API v4)** — catalogue initial des jeux (titres FR, machines, genres). Scraper dans `backend/scrapers/scraper_jvc.py`.
+2. **IGDB** — `title_en` + `pal_status` via DAG Airflow `igdb_pal_status` (hors de ce repo, dans `airflow-local-setup`).
+3. **PriceCharting** — cotes collector (loose/CIB/neuf/gradé/boîte seule/manuel seul), **PAL only**. Mode `@request`, ~1.5s/jeu.
+   ```bash
+   python manage.py scrape_prices --source pricecharting --platform snes,nes,n64,neo,gba,saturn,ps1,dreamcast --all --delay 1
+   ```
+4. **Ricardo.ch** — enchères en cours (CHF).
+   ```bash
+   python manage.py scrape_ricardo --platform snes
+   python manage.py scrape_ricardo                    # toutes les consoles
+   python manage.py scrape_ricardo_targeted           # ciblage jeux de valeur
+   ```
+5. **eBay** — listings marketplace via API eBay (OAuth token caché). Filtre JP/NTSC (cotes PC sont PAL only).
+   ```bash
+   python manage.py scrape_ebay_listings --platform snes
+   ```
 
-### Amazon (prix neuf, EUR)
-```bash
-python manage.py scrape_prices --source amazon --platform snes --limit 50 --parallel 5
-```
-Mode `@browser` (Chrome headless, ~6s/jeu).
-
-### Galaxus (prix neuf, CHF)
-```bash
-python manage.py scrape_prices --source galaxus --platform snes --limit 50 --parallel 5
-```
-
-### Ricardo (enchères en cours, CHF)
-```bash
-python manage.py scrape_ricardo --platform snes
-python manage.py scrape_ricardo  # toutes les consoles
-```
+**Legacy / désactivés** (code présent dans le repo mais plus alimentés en prod) :
+- Amazon (`scrapers/amazon.py`), Galaxus (`scrapers/galaxus.py`), LeBonCoin (`scrapers/leboncoin.py`).
+- Les enums `Price.Source` et `Listing.Source` contiennent encore ces valeurs pour compat des données historiques.
 
 ## API Endpoints
 
@@ -200,6 +228,7 @@ python manage.py scrape_ricardo  # toutes les consoles
 | `GET /api/stats/` | Compteurs (`games_count` PAL vérifié + `games_count_total`) |
 | `GET /api/autocomplete/?q=chr` | Autocomplétion recherche |
 | `GET /api/top/?platform=snes` | Top 200 jeux les plus chers |
+| `GET /api/exchange-rates/` | Taux de change cachés 24h (via Frankfurter.app) — utilisé par le front pour afficher CHF/EUR/USD |
 
 ## Modèles Django
 
