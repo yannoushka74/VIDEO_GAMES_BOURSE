@@ -73,7 +73,7 @@ class GameListSerializer(serializers.ModelSerializer):
     class Meta:
         model = Game
         fields = [
-            "id", "jvc_id", "title", "game_type", "release_date", "cover_url",
+            "id", "jvc_id", "pricecharting_url", "title", "game_type", "release_date", "cover_url",
             "machines", "genres", "latest_price", "latest_loose_price", "listing_count",
         ]
 
@@ -108,7 +108,8 @@ class GameDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = Game
         fields = [
-            "id", "jvc_id", "title", "title_en", "game_type", "game_type_display",
+            "id", "jvc_id", "pricecharting_url", "title", "title_en",
+            "game_type", "game_type_display",
             "release_date", "cover_url", "machines", "genres",
             "prices", "listings", "created_at", "updated_at",
         ]

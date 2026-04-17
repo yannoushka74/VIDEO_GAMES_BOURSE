@@ -44,7 +44,11 @@ class Game(models.Model):
         PAL = "pal", "Sorti en PAL"
         NOT_PAL = "not_pal", "Pas de version PAL"
 
-    jvc_id = models.IntegerField(unique=True, help_text="ID jeuxvideo.com")
+    jvc_id = models.IntegerField(unique=True, null=True, blank=True, help_text="ID jeuxvideo.com (legacy)")
+    pricecharting_url = models.URLField(
+        max_length=500, unique=True, null=True, blank=True,
+        help_text="URL produit PriceCharting (identifiant catalogue primaire)",
+    )
     title = models.CharField(max_length=500, db_index=True)
     title_en = models.CharField(max_length=500, blank=True, help_text="Titre anglais (PriceCharting)")
     game_type = models.IntegerField(choices=GameType.choices, default=GameType.JEU)
