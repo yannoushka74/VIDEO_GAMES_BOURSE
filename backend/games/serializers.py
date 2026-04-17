@@ -7,13 +7,13 @@ from .models import Alert, Game, Genre, Listing, Machine, Price
 class MachineSerializer(serializers.ModelSerializer):
     class Meta:
         model = Machine
-        fields = ["id", "jvc_id", "name", "slug"]
+        fields = ["id", "name", "slug"]
 
 
 class GenreSerializer(serializers.ModelSerializer):
     class Meta:
         model = Genre
-        fields = ["id", "jvc_id", "name", "slug"]
+        fields = ["id", "name", "slug"]
 
 
 class PriceSerializer(serializers.ModelSerializer):
@@ -73,7 +73,7 @@ class GameListSerializer(serializers.ModelSerializer):
     class Meta:
         model = Game
         fields = [
-            "id", "jvc_id", "pricecharting_url", "title", "game_type", "release_date", "cover_url",
+            "id", "pricecharting_url", "title", "game_type", "release_date", "cover_url",
             "machines", "genres", "latest_price", "latest_loose_price", "listing_count",
         ]
 
@@ -108,7 +108,7 @@ class GameDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = Game
         fields = [
-            "id", "jvc_id", "pricecharting_url", "title", "title_en",
+            "id", "pricecharting_url", "title", "title_en",
             "game_type", "game_type_display",
             "release_date", "cover_url", "machines", "genres",
             "prices", "listings", "created_at", "updated_at",

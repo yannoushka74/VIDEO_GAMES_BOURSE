@@ -1,13 +1,11 @@
 export interface Machine {
   id: number;
-  jvc_id: number;
   name: string;
   slug: string;
 }
 
 export interface Genre {
   id: number;
-  jvc_id: number;
   name: string;
   slug: string;
 }
@@ -64,7 +62,7 @@ export interface Listing {
 
 export interface Game {
   id: number;
-  jvc_id: number;
+  pricecharting_url?: string | null;
   title: string;
   title_en?: string;
   game_type: number;

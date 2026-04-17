@@ -100,7 +100,7 @@ function GamesPage() {
         >
           <option value="">Tous les genres</option>
           {genres.map((g) => (
-            <option key={g.id} value={g.jvc_id}>
+            <option key={g.id} value={g.slug}>
               {g.name}
             </option>
           ))}

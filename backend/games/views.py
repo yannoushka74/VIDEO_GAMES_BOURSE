@@ -78,7 +78,7 @@ def _retro_machines_qs():
 class GameFilter(filters.FilterSet):
     title = filters.CharFilter(lookup_expr="icontains")
     machine = filters.CharFilter(field_name="machines__slug")
-    genre = filters.NumberFilter(field_name="genres__jvc_id")
+    genre = filters.CharFilter(field_name="genres__slug")
     price_min = filters.NumberFilter(field_name="latest_loose_price", lookup_expr="gte")
     price_max = filters.NumberFilter(field_name="latest_loose_price", lookup_expr="lte")
     has_price = filters.BooleanFilter(method="filter_has_price")
