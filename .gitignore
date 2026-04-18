@@ -42,3 +42,5 @@ credentials/
 
 # Claude
 .claude/
+dataset/
+*.pth
