@@ -4,7 +4,6 @@ from django.db import models
 class Machine(models.Model):
     """Plateforme de jeu (PC, PS5, Switch, etc.)."""
 
-    jvc_id = models.IntegerField(unique=True, help_text="ID jeuxvideo.com")
     name = models.CharField(max_length=100)
     slug = models.SlugField(max_length=100, unique=True)
 
@@ -18,7 +17,6 @@ class Machine(models.Model):
 class Genre(models.Model):
     """Genre de jeu (RPG, FPS, Action, etc.)."""
 
-    jvc_id = models.IntegerField(unique=True, help_text="ID jeuxvideo.com")
     name = models.CharField(max_length=100)
     slug = models.SlugField(max_length=100, unique=True)
 
@@ -44,7 +42,6 @@ class Game(models.Model):
         PAL = "pal", "Sorti en PAL"
         NOT_PAL = "not_pal", "Pas de version PAL"
 
-    jvc_id = models.IntegerField(unique=True, null=True, blank=True, help_text="ID jeuxvideo.com (legacy)")
     pricecharting_url = models.URLField(
         max_length=500, unique=True, null=True, blank=True,
         help_text="URL produit PriceCharting (identifiant catalogue primaire)",

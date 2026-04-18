@@ -5,13 +5,13 @@ from .models import Alert, AlertNotification, Game, Genre, Machine, Price
 
 @admin.register(Machine)
 class MachineAdmin(admin.ModelAdmin):
-    list_display = ["name", "slug", "jvc_id"]
+    list_display = ["name", "slug"]
     search_fields = ["name"]
 
 
 @admin.register(Genre)
 class GenreAdmin(admin.ModelAdmin):
-    list_display = ["name", "slug", "jvc_id"]
+    list_display = ["name", "slug"]
     search_fields = ["name"]
 
 
