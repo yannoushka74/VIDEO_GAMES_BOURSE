@@ -4,17 +4,17 @@ Chaque page console liste ~150 jeux avec loose/CIB/new prices.
 URL pattern : https://www.pricecharting.com/console/{slug}?cursor={offset}
 
 Usage interne via le management command `import_pricecharting`.
+Pas de dépendance botasaurus — utilise requests + BeautifulSoup.
 """
 
 from __future__ import annotations
 
 import logging
-import re
 import time
 from typing import Iterator
 
-from botasaurus.request import request, Request
-from botasaurus.soupify import soupify
+import requests
+from bs4 import BeautifulSoup
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +37,11 @@ EXCLUDED_KEYWORDS = {
     "strategy guide", "manga", "comic", "soundtrack", "ost",
 }
 
+HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+}
+
 
 def _parse_usd(text: str) -> float | None:
     if not text:
@@ -54,10 +59,10 @@ def _is_excluded(title: str) -> bool:
     return any(kw in lower for kw in EXCLUDED_KEYWORDS)
 
 
-@request(output=None, max_retry=2)
-def _fetch_page(req: Request, url: str):
-    resp = req.get(url)
-    return soupify(resp)
+def _fetch_page(url: str) -> BeautifulSoup:
+    resp = requests.get(url, headers=HEADERS, timeout=15)
+    resp.raise_for_status()
+    return BeautifulSoup(resp.text, "html.parser")
 
 
 def scrape_console_catalog(

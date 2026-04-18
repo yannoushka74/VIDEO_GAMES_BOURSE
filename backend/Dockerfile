@@ -10,7 +10,8 @@ COPY requirements.txt .
 # Install without botasaurus/chrome deps for now (API only)
 RUN pip install --no-cache-dir django==4.2.29 djangorestframework==3.16.1 \
     django-cors-headers==4.9.0 django-filter==25.1 psycopg2-binary==2.9.11 \
-    gunicorn==23.0.0 rapidfuzz==3.10.1 requests==2.32.5
+    gunicorn==23.0.0 rapidfuzz==3.10.1 requests==2.32.5 \
+    beautifulsoup4==4.14.3
 
 COPY . .
 
