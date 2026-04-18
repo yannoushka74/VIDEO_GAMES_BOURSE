@@ -26,11 +26,20 @@ def _parse_usd(text: str) -> float | None:
         return None
 
 
-# Consoles PAL sur PriceCharting (seules ces valeurs sont acceptées)
+# Consoles PAL sur PriceCharting (prioritaires)
 PAL_CONSOLE_NAMES = {
     "pal super nintendo", "pal nes", "pal nintendo 64",
     "pal gameboy advance", "pal sega saturn", "pal neo geo",
     "pal gameboy", "pal sega genesis",
+    "pal playstation", "pal sega dreamcast",
+}
+
+# Consoles NTSC acceptées en fallback (même famille, sans le préfixe PAL)
+NTSC_CONSOLE_NAMES = {
+    "super nintendo", "nes", "nintendo 64",
+    "gameboy advance", "sega saturn", "neo geo aes", "neo geo",
+    "gameboy", "sega genesis",
+    "playstation", "sega dreamcast",
 }
 
 # Mots-clés qui indiquent que ce n'est PAS un jeu vidéo
@@ -85,11 +94,21 @@ def _scrape_logic(req: Request, game_title: str):
         if not candidates:
             return None
 
-        # PAL uniquement
+        # PAL prioritaire, NTSC en fallback
         pal_candidates = [c for c in candidates if c["is_pal"]]
-        if not pal_candidates:
+        ntsc_candidates = [
+            c for c in candidates
+            if not c["is_pal"] and c["console"] in NTSC_CONSOLE_NAMES
+        ]
+        is_ntsc_fallback = False
+        if pal_candidates:
+            best = pal_candidates[0]
+        elif ntsc_candidates:
+            best = ntsc_candidates[0]
+            is_ntsc_fallback = True
+            logger.info("NTSC fallback for '%s': %s", game_title, best["console"])
+        else:
             return None
-        best = pal_candidates[0]
         product_url = best["url"]
         product_title = best["title"]
 
@@ -137,7 +156,7 @@ def _scrape_logic(req: Request, game_title: str):
             "image_url": "",
             "rating": None,
             "review_count": None,
-            "availability": "",
+            "availability": "NTSC fallback" if is_ntsc_fallback else "",
             "category": meta.get("Genre", ""),
             "_game_title": game_title,
         }
