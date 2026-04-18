@@ -19,7 +19,7 @@ from bs4 import BeautifulSoup
 logger = logging.getLogger(__name__)
 
 PAL_CONSOLES = {
-    "neo": "pal-neo-geo",
+    "neo": "neo-geo-aes",  # Pas de page PAL sur PriceCharting pour Neo Geo
     "nes": "pal-nes",
     "snes": "pal-super-nintendo",
     "gba": "pal-gameboy-advance",
@@ -35,6 +35,10 @@ EXCLUDED_KEYWORDS = {
     "card", "cards", "trading", "tcg", "booster", "pokemon card",
     "magic", "yugioh", "yu-gi-oh", "figurine", "amiibo", "guide",
     "strategy guide", "manga", "comic", "soundtrack", "ost",
+    # Accessoires / câbles / hardware
+    "cable", "adapter", "controller", "pad", "rf modulator",
+    "game genie", "game shark", "action replay", "gameshark",
+    "cleaning kit", "converter", "memory card",
 }
 
 HEADERS = {
