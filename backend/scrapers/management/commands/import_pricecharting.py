@@ -101,6 +101,7 @@ class Command(BaseCommand):
                     defaults={
                         "title": title,
                         "title_en": title,
+                        "cover_url": item.get("image_url", ""),
                     },
                 )
                 game.machines.add(machine)
