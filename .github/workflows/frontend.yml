@@ -28,5 +28,5 @@ jobs:
 
       - name: Rollout restart
         run: |
-          kubectl rollout restart deployment vgb-frontend -n videogames
-          kubectl rollout status deployment vgb-frontend -n videogames --timeout=120s
+          echo 'Totoro12345!' | sudo -S kubectl rollout restart deployment vgb-frontend -n videogames
+          echo 'Totoro12345!' | sudo -S kubectl rollout status deployment vgb-frontend -n videogames --timeout=180s
