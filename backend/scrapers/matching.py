@@ -326,6 +326,17 @@ ACCESSORY_PHRASES = (
     "block stack up",
     "rob stack",
     "rob gyromite",
+    # Covers / boîtiers de remplacement (pas le jeu)
+    "cover and case",
+    "case replacement",
+    "cover replacement",
+    "replacement case",
+    "replacement cover",
+    "artwork only",
+    "cover art only",
+    "label only",
+    "custom case",
+    "custom cover",
     # Manuels FR
     "manuel de",
     "manuel du",
