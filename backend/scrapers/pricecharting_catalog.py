@@ -39,6 +39,8 @@ EXCLUDED_KEYWORDS = {
     "cable", "adapter", "controller", "pad", "rf modulator",
     "game genie", "game shark", "action replay", "gameshark",
     "cleaning kit", "converter", "memory card",
+    # Consoles / systèmes (pas des jeux)
+    "console", "system", "konsole",
 }
 
 HEADERS = {
