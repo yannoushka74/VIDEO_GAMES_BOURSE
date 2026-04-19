@@ -42,8 +42,17 @@ EXCLUDED_KEYWORDS = {
     # Consoles / systèmes (pas des jeux)
     "console", "system", "konsole",
     "advance sp", "gameboy sp",
-    "memory pack", "memory card",
+    "memory pack", "memory card", "memory pak",
     "super gameboy",
+    # Accessoires hardware
+    "joystick", "controller", "manette",
+    "power supply", "ac adapter",
+    "expansion pak", "transfer pak", "rumble pak",
+    "light gun", "virtua gun", "multitap",
+    "classic mini",
+    "link cable", "rf switch", "rf modulator",
+    # Bundles console+gun (pas le jeu seul)
+    "gun bundle", "mouse bundle",
 }
 
 # Titres qui commencent par un nom de console = hardware (couleurs, éditions, packs)
