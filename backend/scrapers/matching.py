@@ -646,20 +646,41 @@ def is_likely_accessory(title: str) -> bool:
     return False
 
 
+def _token_overlap(listing_tokens: list[str], game_tokens: list[str]) -> float:
+    """Fraction des tokens du jeu présents dans le listing (exact ou fuzzy 85+)."""
+    if not game_tokens:
+        return 0.0
+    hits = 0
+    for gt in game_tokens:
+        # Exact match
+        if gt in listing_tokens:
+            hits += 1
+            continue
+        # Fuzzy match pour variantes orthographiques (metroid vs metroids)
+        for lt in listing_tokens:
+            if fuzz.ratio(gt, lt) >= 85:
+                hits += 1
+                break
+    return hits / len(game_tokens)
+
+
 def _score_pair(listing_clean: str, listing_nums: set[int],
                 game_clean: str, game_nums: set[int]) -> int:
     """Score de matching entre une annonce nettoyée et un jeu nettoyé.
 
-    Règles dures :
-    - Si l'annonce mentionne un numéro de suite → le jeu doit le mentionner aussi.
-    - Si le jeu mentionne un numéro et l'annonce non → on rejette (suite vs base).
-    - Si les numéros divergent strictement → 0.
+    Stratégie stricte :
+    1. Contrainte numéros de suite (identique à avant)
+    2. TOUS les tokens significatifs du jeu doivent être dans le listing
+       (exact ou fuzzy 85+ pour les variantes orthographiques)
+    3. Score = pourcentage de tokens du jeu trouvés × 100
+
+    Les tokens sont expandés (traductions DE/FR/IT incluses) donc
+    "Pokemon Rubin" matche "Pokemon Ruby" via l'expansion rubin→ruby.
     """
     if listing_nums and game_nums:
         if not (listing_nums & game_nums):
             return 0
     elif listing_nums and not game_nums:
-        # L'annonce parle d'une suite mais le jeu candidat est la base → rejet
         return 0
     elif game_nums and not listing_nums:
         return 0
@@ -667,16 +688,24 @@ def _score_pair(listing_clean: str, listing_nums: set[int],
     if not listing_clean or not game_clean:
         return 0
 
-    # Combinaison pondérée :
-    #   - token_set_ratio (50%) : tolère les mots en trop, capture les
-    #     recouvrements multilingues (vert↔green, feuille↔leaf).
-    #   - token_sort_ratio (30%) : pénalise les mots en trop pour éviter
-    #     que "Castlevania" matche "Castlevania Aria of Sorrow" à 100.
-    #   - partial_ratio (20%) : rattrape les variantes orthographiques.
-    set_score = fuzz.token_set_ratio(listing_clean, game_clean)
-    sort_score = fuzz.token_sort_ratio(listing_clean, game_clean)
-    partial = fuzz.partial_ratio(listing_clean, game_clean)
-    return int(set_score * 0.5 + sort_score * 0.3 + partial * 0.2)
+    listing_tokens = listing_clean.split()
+    game_tokens = game_clean.split()
+
+    # Exiger que TOUS les tokens du jeu soient dans le listing
+    overlap = _token_overlap(listing_tokens, game_tokens)
+    if overlap < 1.0:
+        # Tolérance : pour les jeux avec 4+ tokens, accepter 1 token manquant
+        if len(game_tokens) >= 4 and overlap >= (len(game_tokens) - 1) / len(game_tokens):
+            pass  # OK, 1 token manquant toléré sur les longs titres
+        else:
+            return 0
+
+    # Score = overlap (100 si tous les tokens matchent) pondéré par la
+    # proportion de tokens du listing qui viennent du jeu (pénalise les
+    # listings avec beaucoup de mots en trop)
+    precision = len(game_tokens) / max(len(listing_tokens), 1)
+    # overlap=1.0 → 100, precision faible → léger malus (min 75)
+    return int(overlap * 100 * max(precision, 0.75))
 
 
 def match_listing_title(
