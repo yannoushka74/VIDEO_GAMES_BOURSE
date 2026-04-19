@@ -134,6 +134,7 @@ def main():
     parser.add_argument("--unfreeze", type=int, default=0,
                         help="Nombre de couches backbone à dégeler (0=head only)")
     parser.add_argument("--output-dir", default="ml", help="Dossier de sortie du modèle")
+    parser.add_argument("--model-name", default="condition", help="Préfixe des fichiers de sortie (condition, console)")
     args = parser.parse_args()
 
     data_dir = Path(args.data)
@@ -196,16 +197,18 @@ def main():
 
         if val_acc > best_val_acc:
             best_val_acc = val_acc
-            torch.save(model.state_dict(), output_dir / "condition_model.pth")
+            model_file = output_dir / f"{args.model_name}_model.pth"
+            torch.save(model.state_dict(), model_file)
             print(f"  → Meilleur modèle sauvé (val_acc={val_acc:.4f})")
 
     # Sauver les noms de classes
-    (output_dir / "class_names.txt").write_text("\n".join(full_dataset.classes) + "\n")
-    (output_dir / "training_log.txt").write_text("\n".join(log_lines) + "\n")
+    classes_file = output_dir / f"{args.model_name}_class_names.txt" if args.model_name != "condition" else output_dir / "class_names.txt"
+    classes_file.write_text("\n".join(full_dataset.classes) + "\n")
+    (output_dir / f"{args.model_name}_training_log.txt").write_text("\n".join(log_lines) + "\n")
 
     print(f"\nEntraînement terminé. Best val_acc: {best_val_acc:.4f}")
-    print(f"Modèle: {output_dir / 'condition_model.pth'}")
-    print(f"Classes: {output_dir / 'class_names.txt'}")
+    print(f"Modèle: {output_dir / f'{args.model_name}_model.pth'}")
+    print(f"Classes: {classes_file}")
 
 
 if __name__ == "__main__":

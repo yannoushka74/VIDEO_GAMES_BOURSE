@@ -1,0 +1,8 @@
+dreamcast
+gba
+n64
+neo
+nes
+ps1
+saturn
+snes
