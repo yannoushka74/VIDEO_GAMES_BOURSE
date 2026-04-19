@@ -41,7 +41,25 @@ EXCLUDED_KEYWORDS = {
     "cleaning kit", "converter", "memory card",
     # Consoles / systèmes (pas des jeux)
     "console", "system", "konsole",
+    "advance sp", "gameboy sp",
+    "memory pack", "memory card",
+    "super gameboy",
 }
+
+# Titres qui commencent par un nom de console = hardware (couleurs, éditions, packs)
+# Ex: "Nintendo 64 Pikachu", "Nintendo 64 Fire Orange"
+HARDWARE_TITLE_PREFIXES = (
+    "nintendo 64 ",
+    "super nintendo ",
+    "nes ",
+    "snes ",
+    "playstation ",
+    "dreamcast ",
+    "sega saturn ",
+    "neo geo ",
+    "gameboy advance sp",
+    "game boy advance sp",
+)
 
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
@@ -62,7 +80,11 @@ def _parse_usd(text: str) -> float | None:
 
 def _is_excluded(title: str) -> bool:
     lower = title.lower()
-    return any(kw in lower for kw in EXCLUDED_KEYWORDS)
+    if any(kw in lower for kw in EXCLUDED_KEYWORDS):
+        return True
+    if any(lower.startswith(p) for p in HARDWARE_TITLE_PREFIXES):
+        return True
+    return False
 
 
 def _fetch_page(url: str) -> BeautifulSoup:
