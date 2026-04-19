@@ -188,6 +188,8 @@ ACCESSORY_TOKENS_STRONG = {
     "bedienungsanleitung",
     # Jaquettes / inserts (jamais un jeu)
     "jaquette", "insert", "inlay",
+    # Pièces / accessoires robot ROB NES
+    "spatule",
     # Jouets / collection / cartes
     "lego", "moc", "playmobil", "figurine", "figurines", "amiibo",
     "tcg", "booster", "boosters", "ccg",
@@ -318,6 +320,12 @@ ACCESSORY_PHRASES = (
     "action replay",
     "game genie",
     "game shark",
+    # Robot ROB NES (pièces détachées)
+    "spatule rob",
+    "block rob",
+    "block stack up",
+    "rob stack",
+    "rob gyromite",
     # Manuels FR
     "manuel de",
     "manuel du",
