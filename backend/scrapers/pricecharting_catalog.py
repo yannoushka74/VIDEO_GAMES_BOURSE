@@ -59,6 +59,15 @@ HARDWARE_TITLE_PREFIXES = (
     "neo geo ",
     "gameboy advance sp",
     "game boy advance sp",
+    "game boy advance [",
+    "gameboy advance [",
+    "game boy micro",
+    "gameboy micro",
+    "game boy color",
+    "gameboy color",
+    "game boy pocket",
+    "gameboy pocket",
+    "game commander",
 )
 
 HEADERS = {
