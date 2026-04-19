@@ -301,6 +301,37 @@ def scrape_ricardo_console(driver: Driver, platform_slug: str):
     return results
 
 
+def _scrape_console_parallel(driver: Driver, platform_slug: str):
+    """Version interne pour le batch parallèle."""
+    search_query = CONSOLE_SEARCHES.get(platform_slug)
+    if not search_query:
+        return []
+    search_url = f"https://www.ricardo.ch/fr/s/{search_query}"
+    results = _collect_listings_from_results(driver, search_url)
+    logger.info("Ricardo %s: %d annonces totales", platform_slug, len(results))
+    for r in results:
+        r["platform_slug"] = platform_slug
+    return results
+
+
+def scrape_ricardo_all_parallel(platforms: list[str], parallel: int = 4):
+    """Scrape plusieurs consoles en parallèle (N navigateurs simultanés).
+
+    Retourne un dict {platform_slug: [listings]}.
+    """
+    @browser(headless=True, reuse_driver=False, close_on_crash=True,
+             output=None, parallel=parallel)
+    def _batch(driver: Driver, platform_slug: str):
+        return _scrape_console_parallel(driver, platform_slug)
+
+    results_list = _batch(platforms)
+    # _batch retourne une liste dans le même ordre que platforms
+    results_by_platform = {}
+    for platform, results in zip(platforms, results_list):
+        results_by_platform[platform] = results if results else []
+    return results_by_platform
+
+
 # --- Recherche ciblée par titre de jeu ---
 
 # Mots-clés console à ajouter à la query pour cibler la bonne plateforme

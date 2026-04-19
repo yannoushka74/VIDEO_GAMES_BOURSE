@@ -1,9 +1,11 @@
 """
 Scrape les enchères Ricardo.ch pour les jeux rétro.
 Usage:
-  python manage.py scrape_ricardo                    # toutes les consoles
-  python manage.py scrape_ricardo --platform snes    # SNES uniquement
-  python manage.py scrape_ricardo --platform nes,n64 # NES + N64
+  python manage.py scrape_ricardo                       # toutes les consoles (parallèle)
+  python manage.py scrape_ricardo --platform snes       # SNES uniquement
+  python manage.py scrape_ricardo --platform nes,n64    # NES + N64
+  python manage.py scrape_ricardo --parallel 4          # 4 navigateurs (défaut)
+  python manage.py scrape_ricardo --no-parallel         # séquentiel
 """
 
 import os
@@ -13,8 +15,8 @@ os.environ["DJANGO_ALLOW_ASYNC_UNSAFE"] = "true"
 from django.core.management.base import BaseCommand
 
 from games.models import Game, Listing
-from scrapers.matching import match_listing_title
-from scrapers.ricardo import scrape_ricardo_console, CONSOLE_SEARCHES
+from scrapers.matching import is_alien_platform_listing, is_likely_accessory, match_listing_title
+from scrapers.ricardo import scrape_ricardo_console, scrape_ricardo_all_parallel, CONSOLE_SEARCHES
 
 
 class Command(BaseCommand):
@@ -31,6 +33,23 @@ class Command(BaseCommand):
             action="store_true",
             help="Supprimer les anciennes annonces Ricardo avant import",
         )
+        parser.add_argument(
+            "--parallel",
+            type=int,
+            default=4,
+            help="Nombre de navigateurs en parallèle (défaut: 4)",
+        )
+        parser.add_argument(
+            "--no-parallel",
+            action="store_true",
+            help="Forcer le mode séquentiel",
+        )
+        parser.add_argument(
+            "--threshold",
+            type=int,
+            default=80,
+            help="Seuil de matching (défaut: 80)",
+        )
 
     def handle(self, *args, **options):
         if options["platform"]:
@@ -39,8 +58,6 @@ class Command(BaseCommand):
             platforms = list(CONSOLE_SEARCHES.keys())
 
         if options["clear"]:
-            # Ne supprime que les annonces des plateformes ciblées par ce run
-            # (sinon un run multi-console séquentiel s'efface lui-même)
             deleted = Listing.objects.filter(
                 source=Listing.Source.RICARDO,
                 platform_slug__in=platforms,
@@ -49,31 +66,57 @@ class Command(BaseCommand):
                 f"Supprimé {deleted[0]} anciennes annonces Ricardo ({','.join(platforms)})"
             )
 
+        threshold = options["threshold"]
+        use_parallel = not options["no_parallel"] and len(platforms) > 1
+
+        # Pré-charger les jeux par plateforme
+        games_by_platform = {}
+        for p in platforms:
+            if p in CONSOLE_SEARCHES:
+                games_by_platform[p] = list(
+                    Game.objects.filter(machines__slug=p).distinct()
+                )
+
+        # Scraping
+        if use_parallel:
+            parallel = min(options["parallel"], len(platforms))
+            self.stdout.write(f"\nScraping Ricardo en parallèle ({parallel} navigateurs, {len(platforms)} consoles)...\n")
+            results_by_platform = scrape_ricardo_all_parallel(platforms, parallel=parallel)
+        else:
+            self.stdout.write(f"\nScraping Ricardo séquentiel ({len(platforms)} consoles)...\n")
+            results_by_platform = {}
+            for platform in platforms:
+                if platform not in CONSOLE_SEARCHES:
+                    self.stdout.write(self.style.WARNING(f"Plateforme inconnue: {platform}"))
+                    continue
+                results_by_platform[platform] = scrape_ricardo_console(platform) or []
+
+        # Matching + insertion
         total_found = 0
         total_matched = 0
 
         for platform in platforms:
-            if platform not in CONSOLE_SEARCHES:
-                self.stdout.write(self.style.WARNING(f"Plateforme inconnue: {platform}"))
-                continue
-
+            results = results_by_platform.get(platform, [])
             self.stdout.write(f"\n{'='*50}")
-            self.stdout.write(f"  Ricardo - {platform.upper()}")
+            self.stdout.write(f"  Ricardo - {platform.upper()} ({len(results)} annonces)")
             self.stdout.write(f"{'='*50}\n")
-
-            results = scrape_ricardo_console(platform)
 
             if not results:
                 self.stdout.write(self.style.WARNING("  Aucune annonce trouvée"))
                 continue
 
-            # Pré-charger les jeux de la plateforme (filtre cheap)
-            candidate_games = list(
-                Game.objects.filter(machines__slug=platform).distinct()
-            )
+            candidate_games = games_by_platform.get(platform, [])
 
             for r in results:
-                game, score = match_listing_title(r["title"], candidate_games)
+                # Filtres
+                if is_likely_accessory(r["title"]):
+                    continue
+                if is_alien_platform_listing(r["title"], platform):
+                    continue
+
+                game, score = match_listing_title(
+                    r["title"], candidate_games, threshold=threshold
+                )
 
                 Listing.objects.create(
                     game=game,
