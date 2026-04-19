@@ -15,9 +15,9 @@ from django.core.management.base import BaseCommand
 from django.db import transaction
 
 from games.models import Game, Listing
-from scrapers.matching import is_likely_accessory, match_listing_title
+from scrapers.matching import is_alien_platform_listing, is_likely_accessory, match_listing_title
 
-PLATFORMS = ["snes", "nes", "n64", "gba", "saturn", "neo"]
+PLATFORMS = ["snes", "nes", "n64", "gba", "saturn", "neo", "ps1", "dreamcast"]
 
 
 class Command(BaseCommand):
@@ -93,6 +93,18 @@ class Command(BaseCommand):
 
             if is_likely_accessory(listing.title):
                 accessories += 1
+                # Forcer game=NULL pour les accessoires
+                if old_game_id is not None:
+                    updates_to_apply.append((listing.id, None))
+                    lost_match += 1
+                continue
+
+            # Rejeter les listings d'une console différente
+            if is_alien_platform_listing(listing.title, listing.platform_slug):
+                if old_game_id is not None:
+                    updates_to_apply.append((listing.id, None))
+                    lost_match += 1
+                continue
 
             candidates = games_by_platform.get(listing.platform_slug, [])
             new_game, score = match_listing_title(
