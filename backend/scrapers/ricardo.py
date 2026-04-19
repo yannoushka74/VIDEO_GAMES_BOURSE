@@ -124,16 +124,56 @@ def _extract_listing_from_card(link_el) -> dict | None:
     # Détection de région (PAL/NTSC/JP) — on ne rejette plus, on tag
     region = detect_region(title)
 
-    # Image : prendre la première img non-badge
+    # Image : prendre la première vraie image (pas le placeholder SVG Ricardo)
     image_url = ""
-    for img in link_el.select("img"):
-        alt = (img.get("alt") or "").strip().lower()
-        if alt in BADGE_ALTS:
-            continue
-        src = img.get("src") or img.get("data-src") or ""
-        if src and src.startswith("http"):
-            image_url = src
-            break
+    PLACEHOLDER_PATTERNS = ("RicardoAi.svg", "placeholder", "default-image")
+
+    def _is_real_image(url: str) -> bool:
+        if not url or not url.startswith("http"):
+            return False
+        if url.endswith(".svg"):
+            return False
+        if any(p in url for p in PLACEHOLDER_PATTERNS):
+            return False
+        return True
+
+    # 1. Chercher dans <picture><source> (Ricardo utilise parfois ce pattern)
+    for source in link_el.select("picture source"):
+        srcset = source.get("srcset", "")
+        if srcset:
+            # srcset peut contenir "url 1x, url 2x" — prendre le premier
+            first_url = srcset.split(",")[0].split()[0].strip()
+            if _is_real_image(first_url):
+                image_url = first_url
+                break
+
+    # 2. Chercher dans <img> tags
+    if not image_url:
+        for img in link_el.select("img"):
+            alt = (img.get("alt") or "").strip().lower()
+            if alt in BADGE_ALTS:
+                continue
+            # Tester srcset, data-src, src dans cet ordre de préférence
+            for attr in ("srcset", "data-src", "src"):
+                val = img.get(attr, "")
+                if not val:
+                    continue
+                # srcset: prendre le premier URL
+                url = val.split(",")[0].split()[0].strip()
+                if _is_real_image(url):
+                    image_url = url
+                    break
+            if image_url:
+                break
+
+    # 3. Fallback : chercher dans le style background-image
+    if not image_url:
+        for el in link_el.select("[style]"):
+            style = el.get("style", "")
+            bg_match = re.search(r'url\(["\']?(https?://[^"\')\s]+)', style)
+            if bg_match and _is_real_image(bg_match.group(1)):
+                image_url = bg_match.group(1)
+                break
 
     # Texte du link : contient "titre prix (N enchère) prix_achat_direct date"
     text = link_el.get_text(" ", strip=True)
@@ -200,7 +240,15 @@ def _collect_listings_from_results(driver: Driver, search_url: str) -> list[dict
         page_url = search_url if page == 1 else f"{search_url}?page={page}"
         driver.google_get(page_url)
         driver.short_random_sleep()
-        driver.sleep(6)
+        driver.sleep(8)
+        # Scroll pour déclencher le lazy-loading des images
+        try:
+            driver.run_js("window.scrollTo(0, document.body.scrollHeight / 2)")
+            driver.sleep(2)
+            driver.run_js("window.scrollTo(0, document.body.scrollHeight)")
+            driver.sleep(2)
+        except Exception:
+            pass
 
         soup = soupify(driver.page_html)
         page_links = {a.get("href", "").split("?")[0] for a in soup.select('a[href*="/fr/a/"]')}
@@ -287,7 +335,14 @@ def _scrape_first_page_for_targeted(driver: Driver, search_url: str) -> list[dic
     """Pour une recherche ciblée, on scrape uniquement la première page (résultats les plus pertinents)."""
     driver.google_get(search_url)
     driver.short_random_sleep()
-    driver.sleep(5)
+    driver.sleep(6)
+    try:
+        driver.run_js("window.scrollTo(0, document.body.scrollHeight / 2)")
+        driver.sleep(2)
+        driver.run_js("window.scrollTo(0, document.body.scrollHeight)")
+        driver.sleep(2)
+    except Exception:
+        pass
 
     soup = soupify(driver.page_html)
     results = []
