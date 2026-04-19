@@ -19,7 +19,7 @@ from django.core.management.base import BaseCommand
 from django.db.models import Exists, OuterRef, Q
 
 from scrapers.ebay import EbayScraper, search_ebay, detect_region
-from scrapers.matching import detect_condition, is_likely_accessory, match_listing_title
+from scrapers.matching import detect_condition, is_alien_platform_listing, is_likely_accessory, match_listing_title
 from games.models import Game, Listing, Price
 
 RETRO_SLUGS = {"neo", "nes", "snes", "gba", "saturn", "n64", "ps1", "dreamcast"}
@@ -117,6 +117,10 @@ class Command(BaseCommand):
             for item in items:
                 # Filtrer accessoires, notices, publicités
                 if is_likely_accessory(item["title"]):
+                    skipped += 1
+                    continue
+                # Filtrer les listings d'une autre console (ex: PS2 dans une recherche PS1)
+                if is_alien_platform_listing(item["title"], platform_slug):
                     skipped += 1
                     continue
                 # Vérifier que le titre eBay correspond bien au jeu recherché

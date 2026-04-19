@@ -352,7 +352,7 @@ ACCEPTED_PLATFORM_PHRASES = {
     "gba": ("gba", "game boy advance", "gameboy advance"),
     "saturn": ("saturn", "sega saturn"),
     "neo": ("neo geo", "neogeo", "neo-geo"),
-    "ps1": ("ps1", "psx", "playstation"),
+    "ps1": ("ps1", "psx", "playstation 1", "ps one", "psone"),
     "dreamcast": ("dreamcast", "sega dreamcast"),
 }
 
