@@ -68,6 +68,12 @@ HARDWARE_TITLE_PREFIXES = (
     "game boy pocket",
     "gameboy pocket",
     "game commander",
+    "gameboy advance white", "gameboy advance black", "gameboy advance red",
+    "gameboy advance blue", "gameboy advance pink", "gameboy advance orange",
+    "gameboy advance purple", "gameboy advance clear", "gameboy advance indigo",
+    "gameboy advance spice", "gameboy advance arctic", "gameboy advance flame",
+    "game boy advance white", "game boy advance black", "game boy advance red",
+    "game boy advance blue", "game boy advance pink", "game boy advance indigo",
 )
 
 HEADERS = {
