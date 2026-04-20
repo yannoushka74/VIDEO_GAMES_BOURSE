@@ -35,7 +35,7 @@ def _get_reader():
     global _reader
     if _reader is None:
         import easyocr
-        _reader = easyocr.Reader(["ja", "en", "fr", "de"], gpu=False, verbose=False)
+        _reader = easyocr.Reader(["ja", "en"], gpu=False, verbose=False)
     return _reader
 
 
