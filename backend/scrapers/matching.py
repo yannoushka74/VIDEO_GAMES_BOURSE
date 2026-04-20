@@ -691,21 +691,18 @@ def _score_pair(listing_clean: str, listing_nums: set[int],
     listing_tokens = listing_clean.split()
     game_tokens = game_clean.split()
 
-    # Exiger que TOUS les tokens du jeu soient dans le listing
+    # Exiger que TOUS les tokens du jeu soient dans le listing (STRICT)
+    # Plus de tolérance "1 missing token" : trop permissif (matchait
+    # "Zelda Ocarina of Time" à "Zelda Ocarina of Time Special Edition").
     overlap = _token_overlap(listing_tokens, game_tokens)
     if overlap < 1.0:
-        # Tolérance : pour les jeux avec 4+ tokens, accepter 1 token manquant
-        if len(game_tokens) >= 4 and overlap >= (len(game_tokens) - 1) / len(game_tokens):
-            pass  # OK, 1 token manquant toléré sur les longs titres
-        else:
-            return 0
+        return 0
 
-    # Score = overlap (100 si tous les tokens matchent) pondéré par la
-    # proportion de tokens du listing qui viennent du jeu (pénalise les
-    # listings avec beaucoup de mots en trop)
-    precision = len(game_tokens) / max(len(listing_tokens), 1)
-    # overlap=1.0 → 100, precision faible → léger malus (min 75)
-    return int(overlap * 100 * max(precision, 0.75))
+    # Score basé sur la proportion de tokens du listing qui viennent du jeu
+    # Un game_tokens > listing_tokens signifie qu'on a supprimé du bruit
+    # du listing (noise tokens) → score plafonné à 100
+    precision = min(len(game_tokens) / max(len(listing_tokens), 1), 1.0)
+    return int(100 * max(precision, 0.75))
 
 
 def match_listing_title(
@@ -732,11 +729,13 @@ def match_listing_title(
         return None, 0
     listing_clean = " ".join(listing_tokens)
 
-    best_game = None
-    best_score = 0
+    # Collecter TOUS les candidats valides avec leur nombre de tokens
+    # pour pouvoir choisir le plus specifique (le plus de tokens matches)
+    candidates_scored = []  # [(score, nb_game_tokens, game)]
 
     for game in candidate_games:
-        # Tester title et title_en, garder le meilleur
+        best_game_score = 0
+        best_game_tokens = 0
         for raw_title in (game.title, getattr(game, "title_en", "") or ""):
             if not raw_title:
                 continue
@@ -748,12 +747,20 @@ def match_listing_title(
             game_clean = " ".join(game_tokens)
 
             score = _score_pair(listing_clean, listing_nums, game_clean, game_nums)
-            if score > best_score:
-                best_score = score
-                best_game = game
-                if score == 100:
-                    return best_game, best_score
+            if score > best_game_score:
+                best_game_score = score
+                best_game_tokens = len(game_tokens)
 
-    if best_score >= threshold:
-        return best_game, best_score
-    return None, 0
+        if best_game_score >= threshold:
+            candidates_scored.append((best_game_score, best_game_tokens, game))
+
+    if not candidates_scored:
+        return None, 0
+
+    # Trier par (score desc, nb_tokens desc) → prefere le titre le plus specifique
+    # Ex: "Space Invaders" (2 tokens) gagne sur "Invader" (1 token) a score egal
+    # Ex: "Zelda Ocarina of Time" (4 tokens) gagne sur "Zelda Ocarina of Time [Special Edition]"
+    #     car precision plus haute pour le titre court vs listing court
+    candidates_scored.sort(key=lambda x: (-x[0], -x[1]))
+    score, _, best_game = candidates_scored[0]
+    return best_game, score
