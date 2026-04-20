@@ -188,6 +188,9 @@ def scrape_console_catalog(
 
             img_el = row.select_one("td.image img")
             image_url = img_el.get("src", "") if img_el else ""
+            # Upgrade thumbnails 60.jpg → 320.jpg pour meilleure qualite
+            if image_url.endswith("/60.jpg"):
+                image_url = image_url.replace("/60.jpg", "/320.jpg")
 
             yield {
                 "title": title,
