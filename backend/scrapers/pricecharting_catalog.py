@@ -29,6 +29,17 @@ PAL_CONSOLES = {
     "dreamcast": "pal-sega-dreamcast",
 }
 
+NTSC_CONSOLES = {
+    "neo": "neo-geo-aes",  # Même que PAL (pas de distinction)
+    "nes": "nes",
+    "snes": "super-nintendo",
+    "gba": "gameboy-advance",
+    "saturn": "sega-saturn",
+    "n64": "nintendo-64",
+    "ps1": "playstation",
+    "dreamcast": "sega-dreamcast",
+}
+
 PAGE_SIZE = 150
 
 EXCLUDED_KEYWORDS = {
@@ -120,23 +131,28 @@ def _fetch_page(url: str) -> BeautifulSoup:
 def scrape_console_catalog(
     platform_slug: str,
     delay: float = 1.5,
+    region: str = "pal",
 ) -> Iterator[dict]:
-    """Yield tous les jeux d'une console PAL depuis PriceCharting.
+    """Yield tous les jeux d'une console depuis PriceCharting.
+
+    region: "pal" (défaut) ou "ntsc"
 
     Chaque item contient :
       - title: str
       - product_url: str (URL absolue PriceCharting)
       - product_id: str (data-product attribute)
       - platform_slug: str
-      - pc_console_slug: str (ex: "pal-super-nintendo")
+      - pc_console_slug: str (ex: "pal-super-nintendo" ou "super-nintendo")
+      - region: "pal" | "ntsc"
       - loose_price: float|None (USD)
       - cib_price: float|None (USD)
       - new_price: float|None (USD)
       - image_url: str
     """
-    pc_slug = PAL_CONSOLES.get(platform_slug)
+    consoles_map = NTSC_CONSOLES if region == "ntsc" else PAL_CONSOLES
+    pc_slug = consoles_map.get(platform_slug)
     if not pc_slug:
-        logger.error("Platform slug '%s' not in PAL_CONSOLES", platform_slug)
+        logger.error("Platform slug '%s' not in %s_CONSOLES", platform_slug, region.upper())
         return
 
     cursor = 0
@@ -198,6 +214,7 @@ def scrape_console_catalog(
                 "product_id": product_id,
                 "platform_slug": platform_slug,
                 "pc_console_slug": pc_slug,
+                "region": region,
                 "loose_price": loose,
                 "cib_price": cib,
                 "new_price": new,
