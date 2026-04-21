@@ -19,7 +19,7 @@ from io import BytesIO
 from typing import Optional
 
 import requests
-from PIL import Image
+from PIL import Image, ImageEnhance
 
 logger = logging.getLogger(__name__)
 
@@ -55,8 +55,10 @@ def _count_japanese_chars(text: str) -> int:
 
 def detect_region_from_image(
     image_url: str,
-    jp_char_threshold: int = 3,
+    jp_char_threshold: int = 2,
     timeout: int = 10,
+    min_size: int = 1200,
+    ocr_confidence: float = 0.1,
 ) -> tuple[str, float, dict]:
     """Détecte la région à partir de l'image via OCR.
 
@@ -65,10 +67,11 @@ def detect_region_from_image(
     - confidence: 0.0-1.0
     - details: dict avec les infos OCR
 
-    Stratégie :
-    - Si >= jp_char_threshold caractères japonais détectés → JP
-    - Sinon → "unknown" (on ne peut pas distinguer PAL de NTSC visuellement)
+    Les petites images (< min_size px) sont upscalées avant OCR
+    pour permettre la détection de caractères sur les thumbnails Ricardo.
     """
+    import numpy as np
+
     details = {"japanese_chars": 0, "total_chars": 0, "texts": []}
 
     try:
@@ -78,20 +81,46 @@ def detect_region_from_image(
         if "image" not in content_type:
             return "unknown", 0.0, details
 
+        # Upscale + renforcement contraste/netteté pour les petites images Ricardo
+        img = Image.open(BytesIO(resp.content)).convert("RGB")
+        w, h = img.size
+        if max(w, h) < min_size:
+            scale = min_size / max(w, h)
+            img = img.resize(
+                (int(w * scale), int(h * scale)),
+                Image.LANCZOS,
+            )
+            details["upscaled"] = f"{w}x{h} → {img.size[0]}x{img.size[1]}"
+            img = ImageEnhance.Contrast(img).enhance(1.5)
+            img = ImageEnhance.Sharpness(img).enhance(1.8)
+
         reader = _get_reader()
-        results = reader.readtext(resp.content)
+        # text_threshold bas pour capter les caractères de basse résolution
+        results = reader.readtext(
+            np.array(img),
+            paragraph=False,
+            width_ths=0.3,
+            text_threshold=0.3,
+            low_text=0.2,
+        )
 
         all_text = ""
+        high_conf_jp_chars = 0
         for bbox, text, conf in results:
-            if conf > 0.3:
+            if conf > ocr_confidence:
                 all_text += text
                 details["texts"].append({"text": text, "confidence": conf})
+                # Compter les chars JP en haute confidence séparément
+                if conf > 0.4:
+                    high_conf_jp_chars += _count_japanese_chars(text)
 
         details["total_chars"] = len(all_text)
         details["japanese_chars"] = _count_japanese_chars(all_text)
+        details["high_conf_jp_chars"] = high_conf_jp_chars
 
-        if details["japanese_chars"] >= jp_char_threshold:
-            confidence = min(details["japanese_chars"] / 10, 1.0)
+        # JP si soit (plusieurs chars JP) soit (au moins 1 char JP en haute conf)
+        if details["japanese_chars"] >= jp_char_threshold or high_conf_jp_chars >= 1:
+            confidence = min(max(details["japanese_chars"], high_conf_jp_chars * 2) / 10, 1.0)
             return "JP", confidence, details
 
         return "unknown", 0.5, details
