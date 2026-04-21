@@ -110,16 +110,19 @@ def detect_region_from_image(
             if conf > ocr_confidence:
                 all_text += text
                 details["texts"].append({"text": text, "confidence": conf})
-                # Compter les chars JP en haute confidence séparément
-                if conf > 0.4:
+                # Seuil haute confidence à 0.7 pour éviter les faux positifs
+                # (les artefacts visuels sont souvent détectés à 40-60%)
+                if conf > 0.7:
                     high_conf_jp_chars += _count_japanese_chars(text)
 
         details["total_chars"] = len(all_text)
         details["japanese_chars"] = _count_japanese_chars(all_text)
         details["high_conf_jp_chars"] = high_conf_jp_chars
 
-        # JP si soit (plusieurs chars JP) soit (au moins 1 char JP en haute conf)
-        if details["japanese_chars"] >= jp_char_threshold or high_conf_jp_chars >= 1:
+        # JP si (au moins 3 chars JP total) OU (au moins 2 chars JP en haute conf)
+        # Plus strict que v1 pour éliminer les faux positifs (pitfall, tron, etc.
+        # étaient taggés JP par erreur sur des artefacts visuels)
+        if details["japanese_chars"] >= 3 or high_conf_jp_chars >= 2:
             confidence = min(max(details["japanese_chars"], high_conf_jp_chars * 2) / 10, 1.0)
             return "JP", confidence, details
 
