@@ -647,20 +647,25 @@ def is_likely_accessory(title: str) -> bool:
 
 
 def _token_overlap(listing_tokens: list[str], game_tokens: list[str]) -> float:
-    """Fraction des tokens du jeu présents dans le listing (exact ou fuzzy 85+)."""
+    """Fraction des tokens du jeu présents dans le listing.
+
+    - Exact match prioritaire
+    - Fuzzy match 85+ SEULEMENT pour les tokens de 5+ caractères
+      (évite rob↔robo, war↔wars, pro↔pros qui matchaient trop fort)
+    """
     if not game_tokens:
         return 0.0
     hits = 0
     for gt in game_tokens:
-        # Exact match
         if gt in listing_tokens:
             hits += 1
             continue
-        # Fuzzy match pour variantes orthographiques (metroid vs metroids)
-        for lt in listing_tokens:
-            if fuzz.ratio(gt, lt) >= 85:
-                hits += 1
-                break
+        # Fuzzy uniquement pour tokens >= 5 chars (tolère métroid/metroids)
+        if len(gt) >= 5:
+            for lt in listing_tokens:
+                if len(lt) >= 5 and fuzz.ratio(gt, lt) >= 90:
+                    hits += 1
+                    break
     return hits / len(game_tokens)
 
 
