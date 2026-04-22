@@ -49,6 +49,12 @@ CONDITION_MODEL_TO_DB = {
 class ListingAnalyzer:
     """Pipeline d'analyse multi-modèle pour les images de listings."""
 
+    # Consoles pour lesquelles un modèle région par forme de cartouche existe
+    REGION_MODELS = {
+        "snes": ("ml/region_snes_model.pth", "ml/region_snes_class_names.txt"),
+        # "nes": ("ml/region_nes_model.pth", "ml/region_nes_class_names.txt"),
+    }
+
     def __init__(
         self,
         condition_model: str = "ml/condition_model.pth",
@@ -57,15 +63,18 @@ class ListingAnalyzer:
         console_classes: str = "ml/console_class_names.txt",
         condition_threshold: float = 0.7,
         console_threshold: float = 0.6,
+        region_threshold: float = 0.7,
         enable_ocr: bool = True,
     ):
         self.condition_threshold = condition_threshold
         self.console_threshold = console_threshold
+        self.region_threshold = region_threshold
         self.enable_ocr = enable_ocr
 
         # Lazy load des modèles
         self._condition_clf = None
         self._console_clf = None
+        self._region_clfs = {}  # par platform_slug
         self._condition_model = condition_model
         self._condition_classes = condition_classes
         self._console_model = console_model
@@ -88,6 +97,22 @@ class ListingAnalyzer:
                 self.console_threshold,
             )
         return self._console_clf
+
+    def _get_region_clf(self, platform_slug: str):
+        """Retourne le classifieur région pour la console donnée (ou None)."""
+        if platform_slug not in self.REGION_MODELS:
+            return None
+        if platform_slug in self._region_clfs:
+            return self._region_clfs[platform_slug]
+        model_path, classes_path = self.REGION_MODELS[platform_slug]
+        try:
+            from ml.detect_console import RegionClassifier
+            clf = RegionClassifier(model_path, classes_path, self.region_threshold)
+            self._region_clfs[platform_slug] = clf
+            return clf
+        except FileNotFoundError:
+            self._region_clfs[platform_slug] = None
+            return None
 
     def _download_image(self, url: str, timeout: int = 10) -> Optional[Image.Image]:
         try:
@@ -155,13 +180,28 @@ class ListingAnalyzer:
         except Exception as e:
             logger.warning("Console model failed: %s", e)
 
-        # 3. Région via OCR
-        if self.enable_ocr:
+        # 3a. Région via modèle image (SNES uniquement pour l'instant)
+        region_clf = self._get_region_clf(platform_slug)
+        if region_clf:
+            try:
+                region_img, region_conf_img = region_clf.predict_image(img)
+                if region_conf_img >= self.region_threshold:
+                    result["region_detected"] = region_img.upper()
+                    result["region_confidence"] = region_conf_img
+                    result["region_source"] = "cartridge_shape"
+                    if region_img.upper() != "PAL":
+                        result["flags"].append("region_mismatch")
+            except Exception as e:
+                logger.warning("Region model failed: %s", e)
+
+        # 3b. Région via OCR (fallback / JP detection)
+        if self.enable_ocr and result["region_detected"] == "unknown":
             try:
                 from ml.detect_language import detect_region_from_image
                 region, region_conf, details = detect_region_from_image(image_url)
                 result["region_detected"] = region
                 result["region_confidence"] = region_conf
+                result["region_source"] = "ocr"
                 if region == "JP":
                     result["flags"].append("region_mismatch")
             except Exception as e:

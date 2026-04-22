@@ -109,6 +109,63 @@ def get_console_classifier(**kwargs) -> ConsoleClassifier:
     return _classifier
 
 
+class RegionClassifier:
+    """Classifie la région (PAL/NTSC/JP) d'un jeu par la forme de sa cartouche.
+
+    Disponible pour SNES (cartouches très distinctes : encoches PAL vs
+    sans NTSC vs Super Famicom colorée). Le modèle NES peut être
+    entraîné de la même façon.
+    """
+
+    def __init__(
+        self,
+        model_path: str = "ml/region_snes_model.pth",
+        class_names_path: str = "ml/region_snes_class_names.txt",
+        confidence_threshold: float = 0.7,
+    ):
+        self.class_names = Path(class_names_path).read_text().strip().split("\n")
+        self.confidence_threshold = confidence_threshold
+
+        self.model = models.mobilenet_v2(weights=None)
+        self.model.classifier = nn.Sequential(
+            nn.Dropout(0.3),
+            nn.Linear(self.model.last_channel, len(self.class_names)),
+        )
+        self.model.load_state_dict(
+            torch.load(model_path, map_location=DEVICE, weights_only=True)
+        )
+        self.model.to(DEVICE)
+        self.model.eval()
+
+    def predict_image(self, img: Image.Image) -> tuple[str, float]:
+        img = img.convert("RGB")
+        tensor = _transform(img).unsqueeze(0).to(DEVICE)
+        with torch.no_grad():
+            outputs = self.model(tensor)
+            probs = torch.softmax(outputs, dim=1)
+            confidence, predicted = probs.max(1)
+        return self.class_names[predicted.item()], confidence.item()
+
+    def predict_url(self, url: str, timeout: int = 10) -> tuple[str | None, float]:
+        try:
+            resp = requests.get(url, headers=HEADERS, timeout=timeout)
+            resp.raise_for_status()
+            img = Image.open(BytesIO(resp.content))
+            return self.predict_image(img)
+        except Exception:
+            return None, 0.0
+
+
+_region_classifier = None
+
+
+def get_region_classifier(**kwargs) -> RegionClassifier:
+    global _region_classifier
+    if _region_classifier is None:
+        _region_classifier = RegionClassifier(**kwargs)
+    return _region_classifier
+
+
 if __name__ == "__main__":
     if len(sys.argv) < 2:
         print("Usage: python ml/detect_console.py <image_url>")
