@@ -393,6 +393,26 @@ a:hover {
   font-weight: 500;
 }
 
+.price-card__region {
+  display: inline-block;
+  padding: 0.12rem 0.45rem;
+  border-radius: 0.25rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  margin-left: auto;
+}
+
+.price-card__region--pal {
+  background: #1e3a8a;
+  color: #dbeafe;
+}
+
+.price-card__region--ntsc {
+  background: #7c2d12;
+  color: #fed7aa;
+}
+
 .price-card__details {
   display: flex;
   align-items: baseline;

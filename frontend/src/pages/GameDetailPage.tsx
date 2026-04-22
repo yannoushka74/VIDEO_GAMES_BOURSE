@@ -39,6 +39,11 @@ function PriceChartingCard({ p }: { p: Price }) {
       <div className="price-card__source">
         <PriceChartingIcon size={20} />
         <span>PriceCharting</span>
+        {p.region && (
+          <span className={`price-card__region price-card__region--${p.region}`}>
+            {p.region.toUpperCase()}
+          </span>
+        )}
       </div>
       <div className="price-card__collector">
         <PriceLine label="Loose" usd={p.price} chf={p.price_chf} />
