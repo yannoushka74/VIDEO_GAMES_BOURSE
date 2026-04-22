@@ -204,9 +204,11 @@ def scrape_console_catalog(
 
             img_el = row.select_one("td.image img")
             image_url = img_el.get("src", "") if img_el else ""
-            # Upgrade thumbnails 60.jpg → 320.jpg pour meilleure qualite
+            # Upgrade thumbnails 60.jpg → 240.jpg (meilleure qualite, compatible
+            # avec tous les types d'URLs PC — /320.jpg ne marche pas pour les
+            # URLs `AMIfv...` de Google Drive)
             if image_url.endswith("/60.jpg"):
-                image_url = image_url.replace("/60.jpg", "/320.jpg")
+                image_url = image_url.replace("/60.jpg", "/240.jpg")
 
             yield {
                 "title": title,
