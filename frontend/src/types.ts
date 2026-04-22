@@ -13,6 +13,7 @@ export interface Genre {
 export interface Price {
   id: number;
   source: string;
+  region?: string;
   price: string;
   old_price: string | null;
   discount_percent: number | null;

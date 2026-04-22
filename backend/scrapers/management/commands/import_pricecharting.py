@@ -130,6 +130,7 @@ class Command(BaseCommand):
                         Price.objects.create(
                             game=game,
                             source="pricecharting",
+                            region=region,
                             price=loose,
                             cib_price=item["cib_price"],
                             new_price=item["new_price"],

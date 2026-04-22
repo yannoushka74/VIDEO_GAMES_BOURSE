@@ -116,6 +116,12 @@ class Price(models.Model):
     # Catégorie Amazon (pour valider que c'est bien un jeu)
     category = models.CharField(max_length=300, blank=True)
 
+    # Région (PAL/NTSC pour distinguer les cotes PC)
+    region = models.CharField(
+        max_length=10, blank=True, default="",
+        help_text="pal, ntsc, ou '' pour les sources sans distinction",
+    )
+
     scraped_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

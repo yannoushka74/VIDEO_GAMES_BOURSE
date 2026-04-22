@@ -25,7 +25,7 @@ class PriceSerializer(serializers.ModelSerializer):
     class Meta:
         model = Price
         fields = [
-            "id", "source", "price", "old_price", "discount_percent", "currency",
+            "id", "source", "region", "price", "old_price", "discount_percent", "currency",
             "cib_price", "new_price", "graded_price", "box_only_price", "manual_only_price",
             "price_chf", "cib_price_chf", "new_price_chf", "graded_price_chf",
             "product_url", "product_title", "asin", "image_url",
@@ -115,11 +115,16 @@ class GameDetailSerializer(serializers.ModelSerializer):
         ]
 
     def get_prices(self, obj):
-        """Retourne uniquement le prix le plus récent par source."""
+        """Retourne le prix le plus récent par (source, region).
+
+        PriceCharting peut avoir PAL et NTSC pour un même jeu (après fusion).
+        Les autres sources (ebay, etc.) n'ont pas de région.
+        """
         seen = {}
         for price in obj.prices.order_by("-scraped_at"):
-            if price.source not in seen:
-                seen[price.source] = price
+            key = (price.source, price.region or "")
+            if key not in seen:
+                seen[key] = price
         return PriceSerializer(seen.values(), many=True).data
 
 
