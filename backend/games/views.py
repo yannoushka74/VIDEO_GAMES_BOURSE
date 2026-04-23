@@ -277,15 +277,35 @@ def opportunities(request):
     listings = list(qs)
     game_ids = {l.game_id for l in listings}
 
-    # 2. Précharger TOUS les prix PC pertinents en 1 query SQL,
-    #    grouper par (game_id, region) en Python
-    prices_by_key = {}  # {(game_id, region): Price}
+    # Mapping console → substring attendu dans product_url PriceCharting
+    # Permet de filtrer le prix selon la console du listing (jeux multi-plateforme).
+    SLUG_TO_PC_URL = {
+        "snes": "super-nintendo",
+        "nes": "/nes/",
+        "n64": "nintendo-64",
+        "gba": "gameboy-advance",
+        "saturn": "sega-saturn",
+        "neo": "neo-geo",
+        "ps1": "/playstation",  # attention: pas playstation-2
+        "dreamcast": "sega-dreamcast",
+    }
+
+    # 2. Précharger TOUS les prix PC pertinents en 1 query SQL.
+    #    Clé : (game_id, region, console_slug) pour gérer multi-plateforme.
+    prices_by_key = {}
     for p in (Price.objects.filter(game_id__in=game_ids, source="pricecharting")
               .only("game_id", "region", "price", "cib_price", "new_price",
-                    "graded_price", "scraped_at")
+                    "graded_price", "product_url", "scraped_at")
               .order_by("-scraped_at")):
         region = p.region or "pal"
-        key = (p.game_id, region)
+        # Déterminer la console depuis product_url
+        url = (p.product_url or "").lower()
+        console_slug = ""
+        for slug, pc_sub in SLUG_TO_PC_URL.items():
+            if pc_sub in url:
+                console_slug = slug
+                break
+        key = (p.game_id, region, console_slug)
         if key not in prices_by_key:
             prices_by_key[key] = p
 
@@ -301,11 +321,13 @@ def opportunities(request):
         else:
             desired_region = "pal"
 
-        price = prices_by_key.get((listing.game_id, desired_region))
-        # Fallback : si pas de cote dans la région désirée, prendre l'autre
+        # Chercher le prix pour la CONSOLE exacte du listing
+        console_slug = listing.platform_slug
+        price = prices_by_key.get((listing.game_id, desired_region, console_slug))
+        # Fallback région : si PAL absent pour cette console, essayer NTSC
         if not price:
-            other = "ntsc" if desired_region == "pal" else "pal"
-            price = prices_by_key.get((listing.game_id, other))
+            other_region = "ntsc" if desired_region == "pal" else "pal"
+            price = prices_by_key.get((listing.game_id, other_region, console_slug))
         if not price or not price.price:
             continue
 
