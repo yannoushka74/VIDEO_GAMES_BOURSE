@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap');
+
 *,
 *::before,
 *::after {
@@ -7,57 +9,113 @@
 }
 
 :root {
-  --bg-primary: #0f0f0f;
-  --bg-secondary: #1a1a2e;
-  --bg-card: #16213e;
-  --text-primary: #e0e0e0;
-  --text-secondary: #a0a0a0;
-  --accent: #0f3460;
-  --accent-light: #533483;
-  --highlight: #e94560;
-  --success: #00d2ff;
-  --border: #2a2a4a;
-  --radius: 8px;
+  /* Mario palette */
+  --mario-sky: #5c94fc;       /* ciel cyan/bleu */
+  --mario-sky-light: #73b5ff;
+  --mario-red: #e52521;       /* rouge Mario */
+  --mario-brick: #b86f4a;     /* briques orange */
+  --mario-brick-dark: #8b4a2a;
+  --mario-green: #00a800;     /* tuyaux/sol */
+  --mario-green-dark: #007800;
+  --mario-yellow: #fbc91e;    /* blocs ? */
+  --mario-white: #fefcff;
+  --mario-black: #1a1a1a;
+  --mario-shadow: #000000;
+
+  /* Alias */
+  --bg-primary: var(--mario-sky);
+  --bg-secondary: var(--mario-black);
+  --bg-card: var(--mario-white);
+  --text-primary: var(--mario-black);
+  --text-secondary: #555;
+  --accent: var(--mario-red);
+  --accent-light: var(--mario-yellow);
+  --highlight: var(--mario-red);
+  --success: var(--mario-green);
+  --border: var(--mario-black);
+  --radius: 0;  /* pas d'arrondi en pixel art */
+
+  --pixel-font: "Press Start 2P", monospace;
+  --body-font: "VT323", "Courier New", monospace;
 }
 
 body {
-  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-    sans-serif;
-  background: var(--bg-primary);
+  font-family: var(--body-font);
+  font-size: 20px;
+  background: var(--mario-sky);
   color: var(--text-primary);
-  line-height: 1.6;
+  line-height: 1.4;
   min-height: 100vh;
+  /* Motif sol Mario au bas */
+  background-image:
+    linear-gradient(to bottom, var(--mario-sky) 0%, var(--mario-sky) 75%, var(--mario-brick) 75%, var(--mario-brick) 85%, var(--mario-green) 85%, var(--mario-green) 100%);
+  background-attachment: fixed;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+img {
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+h1, h2, h3, h4 {
+  font-family: var(--pixel-font);
+  color: var(--mario-white);
+  text-shadow:
+    3px 3px 0 var(--mario-black),
+    -1px -1px 0 var(--mario-black),
+    1px -1px 0 var(--mario-black),
+    -1px 1px 0 var(--mario-black),
+    1px 1px 0 var(--mario-black);
+  line-height: 1.5;
+  letter-spacing: 0.05em;
+}
+
+h1 { font-size: 2rem; margin-bottom: 1rem; }
+h2 { font-size: 1.3rem; margin-bottom: 0.8rem; }
+h3 { font-size: 1rem; }
+
+button {
+  font-family: var(--pixel-font);
+  font-size: 0.7rem;
+  cursor: pointer;
 }
 
 a {
-  color: var(--success);
+  color: var(--mario-red);
   text-decoration: none;
+  font-weight: bold;
 }
 
 a:hover {
   text-decoration: underline;
+  color: var(--mario-yellow);
 }
 
 .container {
-  max-width: 1200px;
+  max-width: 1280px;
   margin: 0 auto;
   padding: 2rem 1rem;
 }
 
-/* Navbar */
+/* Navbar — brique Mario */
 .navbar {
-  background: var(--bg-secondary);
-  border-bottom: 1px solid var(--border);
-  padding: 1rem 2rem;
+  background: var(--mario-red);
+  border-bottom: 6px solid var(--mario-black);
+  padding: 0.8rem 2rem;
   display: flex;
   align-items: center;
   gap: 2rem;
+  box-shadow: 0 6px 0 rgba(0, 0, 0, 0.3);
 }
 
 .navbar__logo {
-  font-size: 1.4rem;
-  font-weight: 700;
-  color: var(--highlight);
+  font-family: var(--pixel-font);
+  font-size: 0.9rem;
+  color: var(--mario-white);
+  text-shadow: 2px 2px 0 var(--mario-black);
+  letter-spacing: 0.05em;
 }
 
 .navbar__links {
@@ -67,13 +125,18 @@ a:hover {
 }
 
 .navbar__links a {
-  color: var(--text-secondary);
-  font-weight: 500;
-  transition: color 0.2s;
+  font-family: var(--pixel-font);
+  color: var(--mario-white);
+  font-size: 0.65rem;
+  text-shadow: 2px 2px 0 var(--mario-black);
+  padding: 0.3rem 0.6rem;
+  transition: all 0.1s;
 }
 
 .navbar__links a:hover {
-  color: var(--text-primary);
+  background: var(--mario-yellow);
+  color: var(--mario-black);
+  text-shadow: none;
   text-decoration: none;
 }
 
@@ -86,60 +149,81 @@ a:hover {
 }
 
 .stat-card {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 1.5rem;
+  background: var(--mario-yellow);
+  border: 4px solid var(--mario-black);
+  padding: 1.2rem;
   text-align: center;
+  box-shadow: 4px 4px 0 var(--mario-black);
+  position: relative;
+}
+
+.stat-card::before {
+  content: "?";
+  position: absolute;
+  top: 0.3rem;
+  left: 0.4rem;
+  font-family: var(--pixel-font);
+  font-size: 0.6rem;
+  color: var(--mario-black);
+  opacity: 0.3;
 }
 
 .stat-card__value {
-  font-size: 2.5rem;
-  font-weight: 700;
-  color: var(--success);
+  font-family: var(--pixel-font);
+  font-size: 1.5rem;
+  color: var(--mario-black);
+  text-shadow: 2px 2px 0 var(--mario-white);
 }
 
 .stat-card__label {
-  color: var(--text-secondary);
-  font-size: 0.9rem;
-  margin-top: 0.25rem;
+  font-family: var(--pixel-font);
+  color: var(--mario-black);
+  font-size: 0.6rem;
+  margin-top: 0.5rem;
+  text-transform: uppercase;
 }
 
 /* Top games table */
 .top-table {
   width: 100%;
   border-collapse: collapse;
-  background: var(--bg-card);
-  border-radius: var(--radius);
+  background: var(--mario-white);
+  border: 4px solid var(--mario-black);
+  border-radius: 0;
   overflow: hidden;
-  font-size: 0.85rem;
+  font-family: var(--body-font);
+  font-size: 1rem;
+  box-shadow: 5px 5px 0 var(--mario-black);
 }
 
 .top-table thead {
-  background: var(--bg-secondary);
+  background: var(--mario-red);
   position: sticky;
   top: 0;
 }
 
 .top-table th {
-  padding: 0.6rem 0.75rem;
+  padding: 0.7rem 0.75rem;
   text-align: left;
-  font-weight: 600;
-  color: var(--text-secondary);
-  font-size: 0.75rem;
+  font-family: var(--pixel-font);
+  color: var(--mario-white);
+  font-size: 0.6rem;
   text-transform: uppercase;
   letter-spacing: 0.5px;
   white-space: nowrap;
+  text-shadow: 2px 2px 0 var(--mario-black);
+  border-bottom: 4px solid var(--mario-black);
 }
 
 .top-table td {
-  padding: 0.4rem 0.75rem;
-  border-top: 1px solid var(--border);
+  padding: 0.5rem 0.75rem;
+  border-top: 2px solid var(--mario-black);
   vertical-align: middle;
+  color: var(--mario-black);
 }
 
 .top-table tr:hover {
-  background: var(--bg-secondary);
+  background: var(--mario-yellow);
 }
 
 .top-table__rank {
@@ -158,12 +242,13 @@ a:hover {
 }
 
 .top-table__title {
-  font-weight: 600;
-  color: var(--text-primary);
+  font-family: var(--pixel-font);
+  font-size: 0.65rem;
+  color: var(--mario-black);
 }
 
 .top-table__title:hover {
-  color: var(--success);
+  color: var(--mario-red);
   text-decoration: none;
 }
 
@@ -174,26 +259,32 @@ a:hover {
   color: var(--text-secondary);
 }
 
+.top-table__price {
+  font-family: var(--pixel-font);
+  font-size: 0.7rem;
+}
+
 .top-table__price--loose {
-  color: #4CAF50;
-  font-size: 0.95rem;
+  color: var(--mario-green-dark);
 }
 
 .top-table__price--new {
-  color: #ff9900;
+  color: var(--mario-red);
 }
 
 .top-table__price--graded {
-  color: #e94560;
+  color: #7c2d12;
 }
 
 .top-table__price--ricardo a {
-  color: #00d2ff;
-  font-weight: 600;
+  color: var(--mario-red);
+  font-family: var(--pixel-font);
+  font-size: 0.7rem;
 }
 
 .top-table__price--ricardo a:hover {
-  text-decoration: underline;
+  color: var(--mario-yellow);
+  text-decoration: none;
 }
 
 .top-table__bids {
@@ -211,25 +302,41 @@ a:hover {
 }
 
 .filters input,
-.filters select {
-  background: var(--bg-secondary);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  color: var(--text-primary);
-  padding: 0.6rem 1rem;
-  font-size: 0.95rem;
+.filters select,
+.filters button {
+  background: var(--mario-white);
+  border: 3px solid var(--mario-black);
+  border-radius: 0;
+  color: var(--mario-black);
+  padding: 0.5rem 0.8rem;
+  font-family: var(--body-font);
+  font-size: 1.1rem;
   outline: none;
-  transition: border-color 0.2s;
+  box-shadow: 3px 3px 0 var(--mario-black);
 }
 
 .filters input:focus,
 .filters select:focus {
-  border-color: var(--success);
+  background: var(--mario-yellow);
 }
 
 .filters input {
   flex: 1;
   min-width: 250px;
+}
+
+.filters button {
+  background: var(--mario-red);
+  color: var(--mario-white);
+  font-family: var(--pixel-font);
+  font-size: 0.65rem;
+  cursor: pointer;
+  padding: 0.6rem 0.8rem;
+}
+
+.filters button:hover {
+  background: var(--mario-yellow);
+  color: var(--mario-black);
 }
 
 /* Games grid */
@@ -240,23 +347,25 @@ a:hover {
 }
 
 .game-card {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
+  background: var(--mario-white);
+  border: 4px solid var(--mario-black);
+  border-radius: 0;
   overflow: hidden;
-  transition: transform 0.2s, border-color 0.2s;
+  transition: transform 0.1s;
   cursor: pointer;
+  box-shadow: 5px 5px 0 var(--mario-black);
 }
 
 .game-card:hover {
-  transform: translateY(-4px);
-  border-color: var(--highlight);
+  transform: translate(-2px, -2px);
+  box-shadow: 7px 7px 0 var(--mario-red);
 }
 
 .game-card__cover {
   width: 100%;
   height: 280px;
   object-fit: cover;
+  image-rendering: pixelated;
   background: var(--bg-secondary);
 }
 
@@ -265,21 +374,25 @@ a:hover {
 }
 
 .game-card__title {
-  font-size: 0.95rem;
-  font-weight: 600;
-  margin-bottom: 0.4rem;
+  font-family: var(--pixel-font);
+  font-size: 0.7rem;
+  line-height: 1.4;
+  margin-bottom: 0.5rem;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  color: var(--mario-black);
+  text-shadow: none;
 }
 
 .game-card__meta {
-  font-size: 0.8rem;
-  color: var(--text-secondary);
+  font-family: var(--body-font);
+  font-size: 1rem;
+  color: var(--mario-black);
 }
 
-/* Tags */
+/* Tags — style coin/pièce Mario */
 .tags {
   display: flex;
   flex-wrap: wrap;
@@ -288,33 +401,37 @@ a:hover {
 }
 
 .tag {
-  background: var(--accent);
-  color: var(--text-primary);
-  padding: 0.15rem 0.5rem;
-  border-radius: 4px;
-  font-size: 0.75rem;
+  background: var(--mario-red);
+  color: var(--mario-white);
+  padding: 0.2rem 0.5rem;
+  border-radius: 0;
+  font-family: var(--pixel-font);
+  font-size: 0.55rem;
+  text-transform: uppercase;
+  border: 2px solid var(--mario-black);
 }
 
 .tag--genre {
-  background: var(--accent-light);
+  background: var(--mario-green);
 }
 
-/* Price badge (game card) */
+/* Price badge — style pièce jaune Mario */
 .price-badge {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  background: #1b2e1b;
-  border: 1px solid #4CAF50;
-  border-radius: 4px;
-  padding: 0.2rem 0.5rem;
-  margin-top: 0.4rem;
+  background: var(--mario-yellow);
+  border: 3px solid var(--mario-black);
+  border-radius: 0;
+  padding: 0.3rem 0.6rem;
+  margin-top: 0.6rem;
+  box-shadow: 2px 2px 0 var(--mario-black);
 }
 
 .price-badge__value {
-  font-size: 0.85rem;
-  font-weight: 700;
-  color: #4CAF50;
+  font-family: var(--pixel-font);
+  font-size: 0.7rem;
+  color: var(--mario-black);
 }
 
 /* Price section (detail page) */
@@ -326,18 +443,20 @@ a:hover {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-  background: #1a2e1a;
-  border: 1px solid #2d4a2d;
-  border-radius: var(--radius);
+  background: var(--mario-white);
+  border: 4px solid var(--mario-black);
+  border-radius: 0;
   padding: 1rem 1.25rem;
   margin-bottom: 0.75rem;
   text-decoration: none;
-  color: var(--text-primary);
-  transition: border-color 0.2s;
+  color: var(--mario-black);
+  box-shadow: 4px 4px 0 var(--mario-black);
+  transition: transform 0.1s;
 }
 
 .price-card:hover {
-  border-color: #4CAF50;
+  transform: translate(-2px, -2px);
+  box-shadow: 6px 6px 0 var(--mario-red);
   text-decoration: none;
 }
 
@@ -355,24 +474,25 @@ a:hover {
 }
 
 .price-card__collector-label {
-  font-size: 0.75rem;
-  color: var(--text-secondary);
+  font-family: var(--pixel-font);
+  font-size: 0.55rem;
+  color: var(--mario-black);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
 
 .price-card__collector-value {
-  font-size: 1.1rem;
-  font-weight: 700;
-  color: #4CAF50;
+  font-family: var(--pixel-font);
+  font-size: 0.85rem;
+  color: var(--mario-green-dark);
 }
 
 .price-card__collector-value--high {
-  color: #ff9900;
+  color: var(--mario-red);
 }
 
 .price-card__collector-value--premium {
-  color: #e94560;
+  color: #7c2d12;
 }
 
 .price-card__extras {
@@ -388,29 +508,33 @@ a:hover {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  font-size: 0.85rem;
-  color: var(--text-secondary);
-  font-weight: 500;
+  font-family: var(--pixel-font);
+  font-size: 0.65rem;
+  color: var(--mario-black);
+  border-bottom: 2px dashed var(--mario-black);
+  padding-bottom: 0.5rem;
+  margin-bottom: 0.3rem;
 }
 
 .price-card__region {
   display: inline-block;
-  padding: 0.12rem 0.45rem;
-  border-radius: 0.25rem;
-  font-size: 0.7rem;
-  font-weight: 700;
+  padding: 0.2rem 0.5rem;
+  border-radius: 0;
+  font-family: var(--pixel-font);
+  font-size: 0.55rem;
   letter-spacing: 0.03em;
   margin-left: auto;
+  border: 2px solid var(--mario-black);
 }
 
 .price-card__region--pal {
-  background: #1e3a8a;
-  color: #dbeafe;
+  background: #5c94fc;
+  color: var(--mario-white);
 }
 
 .price-card__region--ntsc {
-  background: #7c2d12;
-  color: #fed7aa;
+  background: var(--mario-red);
+  color: var(--mario-white);
 }
 
 .price-card__details {
@@ -420,9 +544,9 @@ a:hover {
 }
 
 .price-card__price {
-  font-size: 1.6rem;
-  font-weight: 700;
-  color: #ff9900;
+  font-family: var(--pixel-font);
+  font-size: 1.1rem;
+  color: var(--mario-red);
 }
 
 .price-card__old {
@@ -464,46 +588,55 @@ a:hover {
 .listings-table {
   width: 100%;
   border-collapse: collapse;
-  background: var(--bg-card);
-  border-radius: var(--radius);
+  background: var(--mario-white);
+  border: 4px solid var(--mario-black);
   overflow: hidden;
-  font-size: 0.9rem;
+  font-family: var(--body-font);
+  font-size: 1rem;
+  box-shadow: 5px 5px 0 var(--mario-black);
 }
 
 .listings-table thead {
-  background: var(--bg-secondary);
+  background: var(--mario-green);
 }
 
 .listings-table th {
   padding: 0.6rem 1rem;
   text-align: left;
-  font-weight: 600;
-  color: var(--text-secondary);
-  font-size: 0.8rem;
+  font-family: var(--pixel-font);
+  color: var(--mario-white);
+  font-size: 0.6rem;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  text-shadow: 2px 2px 0 var(--mario-black);
+  border-bottom: 4px solid var(--mario-black);
 }
 
 .listings-table td {
   padding: 0.6rem 1rem;
-  border-top: 1px solid var(--border);
+  border-top: 2px solid var(--mario-black);
+  color: var(--mario-black);
 }
 
 .listings-table tr:hover {
-  background: var(--bg-secondary);
+  background: var(--mario-yellow);
 }
 
 .listings-table a {
-  color: var(--success);
+  color: var(--mario-red);
+  font-weight: bold;
 }
 
 .listings-table__price {
-  font-weight: 700;
-  color: #4CAF50;
+  font-family: var(--pixel-font);
+  font-size: 0.7rem;
+  color: var(--mario-green-dark);
 }
 
 .listings-table__buynow {
-  color: #ff9900;
+  font-family: var(--pixel-font);
+  font-size: 0.7rem;
+  color: var(--mario-red);
 }
 
 .listings-table__bids {
@@ -558,7 +691,7 @@ a:hover {
   color: #ff9900;
 }
 
-/* Pagination */
+/* Pagination — style bouton 8-bit */
 .pagination {
   display: flex;
   justify-content: center;
@@ -568,28 +701,37 @@ a:hover {
 }
 
 .pagination button {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  color: var(--text-primary);
-  padding: 0.5rem 1.2rem;
+  background: var(--mario-red);
+  border: 3px solid var(--mario-black);
+  border-radius: 0;
+  color: var(--mario-white);
+  padding: 0.6rem 1rem;
   cursor: pointer;
-  font-size: 0.9rem;
-  transition: background 0.2s;
+  font-family: var(--pixel-font);
+  font-size: 0.65rem;
+  box-shadow: 3px 3px 0 var(--mario-black);
+  text-shadow: 1px 1px 0 var(--mario-black);
 }
 
 .pagination button:hover:not(:disabled) {
-  background: var(--accent);
+  background: var(--mario-yellow);
+  color: var(--mario-black);
+  text-shadow: none;
+  transform: translate(-1px, -1px);
+  box-shadow: 4px 4px 0 var(--mario-black);
 }
 
 .pagination button:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+  background: var(--mario-black);
 }
 
 .pagination__info {
-  color: var(--text-secondary);
-  font-size: 0.9rem;
+  font-family: var(--pixel-font);
+  color: var(--mario-white);
+  font-size: 0.6rem;
+  text-shadow: 2px 2px 0 var(--mario-black);
 }
 
 /* Detail page */
@@ -602,20 +744,26 @@ a:hover {
 
 .game-detail__cover {
   width: 100%;
-  border-radius: var(--radius);
+  border: 4px solid var(--mario-black);
+  box-shadow: 6px 6px 0 var(--mario-black);
+  image-rendering: pixelated;
 }
 
 .game-detail__title {
-  font-size: 2rem;
-  font-weight: 700;
-  margin-bottom: 0.25rem;
+  font-family: var(--pixel-font);
+  font-size: 1.4rem;
+  margin-bottom: 0.5rem;
+  color: var(--mario-white);
+  text-shadow: 3px 3px 0 var(--mario-black);
 }
 
 .game-detail__title-en {
-  font-size: 1rem;
-  color: var(--text-secondary);
+  font-family: var(--body-font);
+  font-size: 1.1rem;
+  color: var(--mario-white);
   font-style: italic;
   margin-bottom: 1rem;
+  text-shadow: 2px 2px 0 var(--mario-black);
 }
 
 .game-detail__release {
@@ -627,8 +775,10 @@ a:hover {
 .loading {
   text-align: center;
   padding: 4rem;
-  color: var(--text-secondary);
-  font-size: 1.1rem;
+  font-family: var(--pixel-font);
+  color: var(--mario-white);
+  font-size: 0.8rem;
+  text-shadow: 3px 3px 0 var(--mario-black);
 }
 
 /* Autocomplete */
@@ -640,18 +790,19 @@ a:hover {
 
 .autocomplete input {
   width: 100%;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  color: var(--text-primary);
-  padding: 0.6rem 1rem;
-  font-size: 0.95rem;
+  background: var(--mario-white);
+  border: 3px solid var(--mario-black);
+  border-radius: 0;
+  color: var(--mario-black);
+  padding: 0.5rem 0.8rem;
+  font-family: var(--body-font);
+  font-size: 1.1rem;
   outline: none;
-  transition: border-color 0.2s;
+  box-shadow: 3px 3px 0 var(--mario-black);
 }
 
 .autocomplete input:focus {
-  border-color: var(--success);
+  background: var(--mario-yellow);
 }
 
 .autocomplete__list {
@@ -659,15 +810,14 @@ a:hover {
   top: 100%;
   left: 0;
   right: 0;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border);
+  background: var(--mario-white);
+  border: 3px solid var(--mario-black);
   border-top: none;
-  border-radius: 0 0 var(--radius) var(--radius);
   list-style: none;
   max-height: 400px;
   overflow-y: auto;
   z-index: 100;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  box-shadow: 4px 4px 0 var(--mario-black);
 }
 
 .autocomplete__item {
@@ -677,10 +827,12 @@ a:hover {
   padding: 0.5rem 1rem;
   cursor: pointer;
   transition: background 0.15s;
+  border-bottom: 1px solid var(--mario-black);
+  color: var(--mario-black);
 }
 
 .autocomplete__item--active {
-  background: var(--accent);
+  background: var(--mario-yellow);
 }
 
 .autocomplete__cover {
