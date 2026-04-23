@@ -234,72 +234,38 @@ def exchange_rates(request):
 def opportunities(request):
     """Annonces Ricardo/eBay sous la cote PriceCharting.
 
-    Optimisé : une seule requête SQL avec annotations au lieu de N+1.
+    Optimisé : préchargement en 1 seul query SQL + cache 5 min.
+    Utilise Price.region (pal/ntsc) pour matcher la bonne cote selon
+    la région du listing (PAL par défaut, NTSC si flag).
     """
+    from django.core.cache import cache
+    import hashlib, json
+
     limit = min(int(request.query_params.get("limit", 100)), 500)
     platform = request.query_params.get("platform", "")
-    min_discount = float(request.query_params.get("min_discount", 20))  # %
+    min_discount = float(request.query_params.get("min_discount", 20))
     source_filter = request.query_params.get("source", "")
+
+    # Cache 5 min par combinaison de params
+    cache_key = "opp:" + hashlib.md5(
+        f"{limit}:{platform}:{min_discount}:{source_filter}".encode()
+    ).hexdigest()
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return Response(cached)
 
     from .exchange import get_rate
     usd_chf = get_rate("USD", "CHF") or 0.79
     chf_eur = get_rate("CHF", "EUR") or 1.09
     usd_eur = get_rate("USD", "EUR") or 0.86
 
-    # Mapping platform_slug → substring dans l'URL PriceCharting product_url
-    # Ex: platform_slug="saturn" → product_url contient "pal-sega-saturn"
-    SLUG_TO_PC_URL = {
-        "snes": "pal-super-nintendo",
-        "nes": "pal-nes",
-        "n64": "pal-nintendo-64",
-        "gba": "pal-gameboy-advance",
-        "saturn": "pal-sega-saturn",
-        "neo": "pal-neo-geo",
-        "ps1": "pal-playstation",
-        "dreamcast": "pal-sega-dreamcast",
-    }
-
-    # Subqueries pour le dernier prix PriceCharting par jeu ET par console
-    # On filtre sur product_url contenant le slug de la console du listing.
-    # OuterRef("platform_slug") n'est pas directement utilisable dans Contains,
-    # donc on fait le filtrage en Python après.
-    latest_pc_loose = Subquery(
-        Price.objects.filter(game=OuterRef("game_id"), source="pricecharting")
-        .order_by("-scraped_at").values("price")[:1]
-    )
-    latest_pc_cib = Subquery(
-        Price.objects.filter(game=OuterRef("game_id"), source="pricecharting")
-        .order_by("-scraped_at").values("cib_price")[:1]
-    )
-    latest_pc_new = Subquery(
-        Price.objects.filter(game=OuterRef("game_id"), source="pricecharting")
-        .order_by("-scraped_at").values("new_price")[:1]
-    )
-    latest_pc_graded = Subquery(
-        Price.objects.filter(game=OuterRef("game_id"), source="pricecharting")
-        .order_by("-scraped_at").values("graded_price")[:1]
-    )
-    # Aussi récupérer le product_url pour vérifier la console
-    latest_pc_url = Subquery(
-        Price.objects.filter(game=OuterRef("game_id"), source="pricecharting")
-        .order_by("-scraped_at").values("product_url")[:1]
-    )
-
+    # 1. Récupérer les listings (1 query)
     qs = (
         Listing.objects.filter(
             source__in=["ricardo", "ebay"],
             game__isnull=False,
             current_price__gte=5,
-            region__in=["PAL", "unknown", ""],  # exclure JP et NTSC (cotes PAL only)
         )
-        .annotate(
-            pc_loose=latest_pc_loose,
-            pc_cib=latest_pc_cib,
-            pc_new=latest_pc_new,
-            pc_graded=latest_pc_graded,
-            pc_url=latest_pc_url,
-        )
-        .filter(pc_loose__isnull=False)  # uniquement les jeux avec cote
         .select_related("game")
         .prefetch_related("game__machines")
     )
@@ -308,42 +274,53 @@ def opportunities(request):
     if platform:
         qs = qs.filter(platform_slug=platform)
 
+    listings = list(qs)
+    game_ids = {l.game_id for l in listings}
+
+    # 2. Précharger TOUS les prix PC pertinents en 1 query SQL,
+    #    grouper par (game_id, region) en Python
+    prices_by_key = {}  # {(game_id, region): Price}
+    for p in (Price.objects.filter(game_id__in=game_ids, source="pricecharting")
+              .only("game_id", "region", "price", "cib_price", "new_price",
+                    "graded_price", "scraped_at")
+              .order_by("-scraped_at")):
+        region = p.region or "pal"
+        key = (p.game_id, region)
+        if key not in prices_by_key:
+            prices_by_key[key] = p
+
+    # 3. Iteration en mémoire (plus de queries SQL)
     results = []
-    for listing in qs.iterator():
-        # Vérifier que la cote PriceCharting correspond à la MÊME console que le listing.
-        # Sinon on compare Saturn à PS1 pour un jeu multi-plateforme (bug Courier Crisis).
-        pc_url = listing.pc_url or ""
-        expected_url_part = SLUG_TO_PC_URL.get(listing.platform_slug, "")
-        if expected_url_part and expected_url_part not in pc_url:
-            # La cote est pour une autre console → chercher la bonne cote
-            matching_price = (
-                Price.objects.filter(
-                    game_id=listing.game_id,
-                    source="pricecharting",
-                    product_url__contains=expected_url_part,
-                )
-                .order_by("-scraped_at")
-                .first()
-            )
-            if not matching_price:
-                continue  # pas de cote pour cette console
-            listing.pc_loose = matching_price.price
-            listing.pc_cib = matching_price.cib_price
-            listing.pc_new = matching_price.new_price
-            listing.pc_graded = matching_price.graded_price
+    for listing in listings:
+        # Choisir la région de cote à utiliser selon la région du listing
+        listing_region_up = (listing.region or "").upper()
+        if listing_region_up == "NTSC":
+            desired_region = "ntsc"
+        elif listing_region_up == "JP":
+            continue  # pas de cote PC fiable pour JP
+        else:
+            desired_region = "pal"
+
+        price = prices_by_key.get((listing.game_id, desired_region))
+        # Fallback : si pas de cote dans la région désirée, prendre l'autre
+        if not price:
+            other = "ntsc" if desired_region == "pal" else "pal"
+            price = prices_by_key.get((listing.game_id, other))
+        if not price or not price.price:
+            continue
 
         condition = listing.condition or "loose"
-        if condition == "cib" and listing.pc_cib:
-            ref_usd = float(listing.pc_cib)
+        if condition == "cib" and price.cib_price:
+            ref_usd = float(price.cib_price)
             ref_source = "cib"
-        elif condition == "new" and listing.pc_new:
-            ref_usd = float(listing.pc_new)
+        elif condition == "new" and price.new_price:
+            ref_usd = float(price.new_price)
             ref_source = "new"
-        elif condition == "graded" and listing.pc_graded:
-            ref_usd = float(listing.pc_graded)
+        elif condition == "graded" and price.graded_price:
+            ref_usd = float(price.graded_price)
             ref_source = "graded"
         else:
-            ref_usd = float(listing.pc_loose)
+            ref_usd = float(price.price)
             ref_source = "loose"
         if ref_usd <= 0:
             continue
@@ -389,10 +366,14 @@ def opportunities(request):
             "bid_count": listing.bid_count,
             "ends_at": listing.ends_at.isoformat() if listing.ends_at else None,
             "ref_source": ref_source,
+            "ref_region": desired_region,
             "ref_price_usd": round(ref_usd, 2),
             "discount_percent": round(discount_pct, 1),
         })
 
-    # Tri par décote décroissante
     results.sort(key=lambda r: r["discount_percent"], reverse=True)
-    return Response(results[:limit])
+    results = results[:limit]
+
+    # Cache 5 min
+    cache.set(cache_key, results, 300)
+    return Response(results)
