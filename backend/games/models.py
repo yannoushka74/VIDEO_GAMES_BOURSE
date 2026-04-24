@@ -177,6 +177,51 @@ class Listing(models.Model):
         return f"{self.title[:50]} - {self.current_price} {self.currency} ({self.source})"
 
 
+class SaleRecord(models.Model):
+    """Prix de vente réel d'une annonce terminée (vendue).
+
+    Sert à construire une cote marché réelle à partir des ventes effectives
+    sur Ricardo/eBay, indépendante de PriceCharting.
+    """
+
+    class Source(models.TextChoices):
+        RICARDO = "ricardo", "Ricardo"
+        EBAY = "ebay", "eBay"
+
+    game = models.ForeignKey(
+        Game, on_delete=models.CASCADE, related_name="sales",
+        null=True, blank=True,
+    )
+    source = models.CharField(max_length=20, choices=Source.choices)
+    platform_slug = models.SlugField(max_length=20)
+
+    final_price = models.DecimalField(max_digits=10, decimal_places=2)
+    currency = models.CharField(max_length=3, default="CHF")
+
+    condition = models.CharField(max_length=100, blank=True)
+    region = models.CharField(max_length=10, blank=True)
+
+    listing_title = models.CharField(max_length=500)
+    listing_url = models.URLField(max_length=500)
+
+    sold_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-sold_at"]
+        indexes = [
+            models.Index(fields=["game", "platform_slug", "-sold_at"]),
+            models.Index(fields=["source", "-sold_at"]),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["source", "listing_url"], name="uniq_sale_source_url"
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.listing_title[:40]} @ {self.final_price} {self.currency}"
+
+
 class Alert(models.Model):
     """Watch utilisateur : notifier si une annonce pour un jeu passe sous un prix cible."""
 

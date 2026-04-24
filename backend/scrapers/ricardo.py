@@ -125,10 +125,11 @@ def _is_ended_card(text: str) -> bool:
     return False
 
 
-def _extract_listing_from_card(link_el) -> dict | None:
+def _extract_listing_from_card(link_el, include_ended: bool = False) -> dict | None:
     """Extrait une annonce depuis son élément <a> de la liste de résultats.
 
-    Retourne None si l'annonce est déjà terminée (badge "Vendu" / "Terminé").
+    Si include_ended=False (défaut), retourne None pour les annonces terminées.
+    Si include_ended=True, retourne le dict avec un flag 'ended=True'.
     """
     href = link_el.get("href", "")
     if not href or "/fr/a/" not in href:
@@ -139,9 +140,10 @@ def _extract_listing_from_card(link_el) -> dict | None:
     if listing_url.startswith("/"):
         listing_url = f"https://www.ricardo.ch{listing_url}"
 
-    # Vérifier si l'annonce est terminée (texte de la carte entière)
+    # Vérifier si l'annonce est terminée
     card_text = link_el.get_text(" ", strip=True)
-    if _is_ended_card(card_text):
+    is_ended = _is_ended_card(card_text)
+    if is_ended and not include_ended:
         return None
 
     # Titre : source unique = slug URL (déterministe, les alt img sont des badges)
@@ -253,14 +255,18 @@ def _extract_listing_from_card(link_el) -> dict | None:
         "bid_count": bid_count,
         "region": region,
         "condition": detect_condition(title),
+        "ended": is_ended,
     }
 
 
 MAX_PAGES = 20  # garde-fou
 
 
-def _collect_listings_from_results(driver: Driver, search_url: str) -> list[dict]:
-    """Itère sur ?page=N jusqu'à épuisement des résultats."""
+def _collect_listings_from_results(driver: Driver, search_url: str, include_ended: bool = False) -> list[dict]:
+    """Itère sur ?page=N jusqu'à épuisement des résultats.
+
+    Si include_ended=True, inclut aussi les annonces terminées (avec flag 'ended').
+    """
     all_results: list[dict] = []
     seen_urls: set[str] = set()
 
@@ -298,7 +304,7 @@ def _collect_listings_from_results(driver: Driver, search_url: str) -> list[dict
             if href in seen_urls:
                 continue
             seen_urls.add(href)
-            listing = _extract_listing_from_card(link)
+            listing = _extract_listing_from_card(link, include_ended=include_ended)
             if listing:
                 all_results.append(listing)
                 page_count += 1
