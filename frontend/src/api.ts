@@ -78,3 +78,36 @@ export function getOpportunities(params: Record<string, string> = {}): Promise<O
   const query = new URLSearchParams(params).toString();
   return fetchJSON(`${API_BASE}/opportunities/?${query}`);
 }
+
+export interface MarketCoteStats {
+  count: number;
+  avg: number;
+  median: number;
+  min: number;
+  max: number;
+  stddev: number;
+}
+
+export interface MarketCoteSale {
+  final_price: string;
+  currency: string;
+  condition: string;
+  region: string;
+  platform_slug: string;
+  listing_title: string;
+  listing_url: string;
+  source: string;
+  sold_at: string;
+}
+
+export interface MarketCoteResponse {
+  currency: string;
+  period_days: number;
+  total_sales: number;
+  by_condition: Record<string, MarketCoteStats>;
+  recent_sales: MarketCoteSale[];
+}
+
+export function getMarketCote(gameId: number, days = 365): Promise<MarketCoteResponse> {
+  return fetchJSON(`${API_BASE}/market-cote/?game_id=${gameId}&days=${days}`);
+}

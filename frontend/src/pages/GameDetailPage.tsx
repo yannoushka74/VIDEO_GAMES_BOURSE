@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { getGame } from "../api";
+import { getGame, getMarketCote } from "../api";
+import type { MarketCoteResponse } from "../api";
 import type { Game, Price } from "../types";
 import PriceChartingIcon from "../components/PriceChartingIcon";
 import PriceHistoryChart from "../components/PriceHistoryChart";
@@ -99,6 +100,59 @@ function GenericPriceCard({ p }: { p: Price }) {
   );
 }
 
+function MarketCoteCard({ gameId }: { gameId: number }) {
+  const [cote, setCote] = useState<MarketCoteResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    getMarketCote(gameId, 365)
+      .then(setCote)
+      .catch(() => setCote(null))
+      .finally(() => setLoading(false));
+  }, [gameId]);
+
+  if (loading || !cote || cote.total_sales === 0) return null;
+
+  const conditions = ["loose", "cib", "new", "graded"].filter(
+    (c) => cote.by_condition[c]
+  );
+  if (conditions.length === 0) return null;
+
+  return (
+    <div className="price-section" style={{ marginTop: "1rem" }}>
+      <h3 style={{ marginBottom: "0.75rem" }}>
+        📊 Cote marché ({cote.total_sales} ventes, {cote.period_days}j)
+      </h3>
+      <div className="price-card">
+        <div className="price-card__source">
+          <span>Ventes réelles Ricardo + eBay</span>
+        </div>
+        <div className="price-card__collector">
+          {conditions.map((c) => {
+            const s = cote.by_condition[c];
+            return (
+              <div key={c} className="price-card__collector-item">
+                <span className="price-card__collector-label">
+                  {c.toUpperCase()} ({s.count})
+                </span>
+                <span className="price-card__collector-value">
+                  Médian: {s.median} {cote.currency}
+                </span>
+                <span
+                  className="price-card__collector-label"
+                  style={{ fontSize: "0.5rem" }}
+                >
+                  min {s.min} / avg {s.avg} / max {s.max}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function GameDetailPage() {
   const { id } = useParams<{ id: string }>();
   const [game, setGame] = useState<Game | null>(null);
@@ -140,6 +194,9 @@ function GameDetailPage() {
           <p className="game-detail__release">
             {game.release_date || "Date de sortie inconnue"}
           </p>
+
+          {/* Cote marché (ventes réelles) */}
+          <MarketCoteCard gameId={game.id} />
 
           {/* Prix PriceCharting */}
           {priceChartingPrices.length > 0 && (

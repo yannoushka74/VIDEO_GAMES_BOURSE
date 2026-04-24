@@ -16,4 +16,5 @@ urlpatterns = [
     path("autocomplete/", views.autocomplete, name="autocomplete"),
     path("opportunities/", views.opportunities, name="opportunities"),
     path("exchange-rates/", views.exchange_rates, name="exchange-rates"),
+    path("market-cote/", views.market_cote, name="market-cote"),
 ]

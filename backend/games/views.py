@@ -7,7 +7,7 @@ from django.db.models import Exists, F, Max, OuterRef, Q, Subquery
 from django.utils import timezone
 
 from .exchange import chf_to_eur, chf_to_usd, usd_to_chf
-from .models import Alert, Game, Genre, Listing, Machine, Price
+from .models import Alert, Game, Genre, Listing, Machine, Price, SaleRecord
 from .serializers import (
     AlertSerializer,
     GameDetailSerializer,
@@ -408,3 +408,99 @@ def opportunities(request):
     # Cache 5 min
     cache.set(cache_key, results, 300)
     return Response(results)
+
+
+@api_view(["GET"])
+def market_cote(request):
+    """Cote marché réelle basée sur les ventes effectives (SaleRecord).
+
+    Params :
+    - game_id : cote pour un jeu précis
+    - platform : filtrer par console
+    - condition : loose/cib/new/graded
+    - source : ricardo, ebay
+    - days : uniquement les ventes des N derniers jours (défaut 365)
+
+    Retourne :
+    - count, avg, median, min, max, stddev par condition
+    - currency unifiée (CHF)
+    - sales récentes pour illustration
+    """
+    from datetime import timedelta
+    from decimal import Decimal
+    from statistics import median, stdev
+
+    game_id = request.query_params.get("game_id")
+    platform = request.query_params.get("platform", "")
+    condition = request.query_params.get("condition", "")
+    source = request.query_params.get("source", "")
+    days = int(request.query_params.get("days", 365))
+
+    from .exchange import get_rate
+    usd_chf = get_rate("USD", "CHF") or 0.79
+    eur_chf = 1 / (get_rate("CHF", "EUR") or 1.09)
+
+    cutoff = timezone.now() - timedelta(days=days)
+    qs = SaleRecord.objects.filter(sold_at__gte=cutoff)
+    if game_id:
+        qs = qs.filter(game_id=int(game_id))
+    if platform:
+        qs = qs.filter(platform_slug=platform)
+    if source:
+        qs = qs.filter(source=source)
+
+    # Agréger par condition, en CHF
+    by_condition = {}
+    for sale in qs.iterator():
+        cond = sale.condition or "loose"
+        if condition and cond != condition:
+            continue
+        # Convertir en CHF
+        price = float(sale.final_price)
+        if sale.currency == "CHF":
+            price_chf = price
+        elif sale.currency == "EUR":
+            price_chf = price / (get_rate("CHF", "EUR") or 1.09)
+        elif sale.currency == "USD":
+            price_chf = price * usd_chf
+        else:
+            price_chf = price
+        by_condition.setdefault(cond, []).append(price_chf)
+
+    def _stats(prices: list[float]) -> dict:
+        if not prices:
+            return {}
+        return {
+            "count": len(prices),
+            "avg": round(sum(prices) / len(prices), 2),
+            "median": round(median(prices), 2),
+            "min": round(min(prices), 2),
+            "max": round(max(prices), 2),
+            "stddev": round(stdev(prices), 2) if len(prices) > 1 else 0,
+        }
+
+    result = {
+        "currency": "CHF",
+        "period_days": days,
+        "by_condition": {c: _stats(p) for c, p in by_condition.items()},
+        "total_sales": sum(len(p) for p in by_condition.values()),
+    }
+
+    # Ventes récentes pour illustration (20 max)
+    recent = qs.order_by("-sold_at")[:20]
+    result["recent_sales"] = [
+        {
+            "final_price": str(s.final_price),
+            "currency": s.currency,
+            "condition": s.condition,
+            "region": s.region,
+            "platform_slug": s.platform_slug,
+            "listing_title": s.listing_title[:80],
+            "listing_url": s.listing_url,
+            "source": s.source,
+            "sold_at": s.sold_at.isoformat(),
+        }
+        for s in recent
+    ]
+
+    return Response(result)
