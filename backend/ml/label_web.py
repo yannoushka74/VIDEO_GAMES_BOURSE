@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Interface web de labellisation rapide pour le dataset condition.
+"""Interface web de labellisation rapide pour un dataset N classes.
 
-Affiche une image à la fois avec 4 boutons : loose / cib / sealed / delete.
-Raccourcis clavier : 1=loose, 2=cib, 3=sealed, 4=delete, → next, ← prev.
+Détecte automatiquement les classes depuis les sous-dossiers du dataset.
+Raccourcis clavier : 1..N = classes, d = delete, → next, ← prev.
 
 Usage :
     python ml/label_web.py --dataset ../dataset --port 8080
-    # puis ouvrir http://localhost:8080
+    python ml/label_web.py --dataset ../console_dataset --port 8081
 """
 
 from __future__ import annotations
@@ -17,16 +17,17 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-CLASSES = ["loose", "cib", "sealed"]
+CLASSES = []  # set dynamically
 
 
 class LabelServer(BaseHTTPRequestHandler):
     dataset = None  # Path — set below
+    classes = []    # list of class names
 
     def _list_images(self):
         """Liste toutes les images du dataset avec leur classe actuelle."""
         imgs = []
-        for cls in CLASSES:
+        for cls in self.classes:
             cls_dir = self.dataset / cls
             if cls_dir.exists():
                 for p in sorted(cls_dir.glob("*.jpg")):
@@ -69,12 +70,11 @@ class LabelServer(BaseHTTPRequestHandler):
             self._redirect("/?i=0")
             return
         old_cls, name = imgs[idx]
-        if new_cls != old_cls and new_cls in CLASSES:
+        if new_cls != old_cls and new_cls in self.classes:
             src = self.dataset / old_cls / name
             dst = self.dataset / new_cls / name
             dst.parent.mkdir(parents=True, exist_ok=True)
             shutil.move(str(src), str(dst))
-        # Continuer à l'image suivante (même index car on a retiré celle-ci si cross-class)
         next_idx = idx + 1 if new_cls == old_cls else idx
         self._redirect(f"/?i={next_idx}")
 
@@ -104,8 +104,21 @@ class LabelServer(BaseHTTPRequestHandler):
             idx = 0
 
         cls, name = imgs[idx]
-        counts = {c: sum(1 for cc, _ in imgs if cc == c) for c in CLASSES}
+        counts = {c: sum(1 for cc, _ in imgs if cc == c) for c in self.classes}
         counts_str = " · ".join(f"{c}: {n}" for c, n in counts.items())
+
+        # Générer les boutons dynamiquement pour N classes
+        buttons_html = ""
+        shortcut_js = ""
+        for i, c in enumerate(self.classes, 1):
+            current_cls_marker = "btn-current" if cls == c else ""
+            buttons_html += (
+                f'<a class="btn-class {current_cls_marker}" '
+                f'href="/label?i={idx}&cls={c}">{c.upper()} ({i})</a>\n'
+            )
+            shortcut_js += (
+                f"  if (e.key === '{i}') window.location = '/label?i={idx}&cls={c}';\n"
+            )
 
         html = f"""
 <!DOCTYPE html>
@@ -128,11 +141,9 @@ class LabelServer(BaseHTTPRequestHandler):
     border-radius: 4px; cursor: pointer; text-decoration: none;
     display: inline-block; min-width: 100px;
   }}
-  .btn-loose {{ border-color: #2196F3; }}
-  .btn-cib {{ border-color: #4CAF50; }}
-  .btn-sealed {{ border-color: #ff9800; }}
+  .btn-class {{ border-color: #4CAF50; }}
   .btn-delete {{ border-color: #f44336; }}
-  .btn-current {{ background: #555; }}
+  .btn-current {{ background: #555; border-color: #fff; }}
   .nav {{ margin-top: 20px; }}
   .nav a {{ margin: 0 20px; color: #888; text-decoration: none; }}
   .help {{ color: #888; font-size: 12px; margin-top: 20px; }}
@@ -146,22 +157,18 @@ class LabelServer(BaseHTTPRequestHandler):
   </div>
   <div class="current">Classe actuelle : <b>{cls}</b></div>
   <div class="buttons">
-    <a class="btn-loose {'btn-current' if cls == 'loose' else ''}" href="/label?i={idx}&cls=loose">Loose (1)</a>
-    <a class="btn-cib {'btn-current' if cls == 'cib' else ''}" href="/label?i={idx}&cls=cib">CIB (2)</a>
-    <a class="btn-sealed {'btn-current' if cls == 'sealed' else ''}" href="/label?i={idx}&cls=sealed">Sealed (3)</a>
-    <a class="btn-delete" href="/delete?i={idx}">Delete (4)</a>
+    {buttons_html}
+    <a class="btn-delete" href="/delete?i={idx}">Delete (d)</a>
   </div>
   <div class="nav">
     <a href="/?i={max(0, idx-1)}">← Précédent</a>
     <a href="/?i={idx+1}">Suivant →</a>
   </div>
-  <div class="help">Raccourcis : 1=loose · 2=cib · 3=sealed · 4=delete · ←/→ nav</div>
+  <div class="help">Raccourcis : {" · ".join(f"{i+1}={c}" for i, c in enumerate(self.classes))} · d=delete · ←/→ nav</div>
 <script>
 document.addEventListener('keydown', (e) => {{
-  if (e.key === '1') window.location = '/label?i={idx}&cls=loose';
-  else if (e.key === '2') window.location = '/label?i={idx}&cls=cib';
-  else if (e.key === '3') window.location = '/label?i={idx}&cls=sealed';
-  else if (e.key === '4') window.location = '/delete?i={idx}';
+{shortcut_js}
+  if (e.key === 'd') window.location = '/delete?i={idx}';
   else if (e.key === 'ArrowRight') window.location = '/?i={idx+1}';
   else if (e.key === 'ArrowLeft') window.location = '/?i={max(0, idx-1)}';
 }});
@@ -189,6 +196,12 @@ def main():
     args = parser.parse_args()
 
     LabelServer.dataset = Path(args.dataset).resolve()
+    # Détection auto des classes (sous-dossiers)
+    LabelServer.classes = sorted([d.name for d in LabelServer.dataset.iterdir() if d.is_dir()])
+    if not LabelServer.classes:
+        print(f"Aucune classe trouvée dans {LabelServer.dataset}")
+        return
+    print(f"Classes détectées : {LabelServer.classes}")
     server = HTTPServer((args.host, args.port), LabelServer)
     print(f"Labellisation : http://{args.host}:{args.port}")
     print(f"Dataset : {LabelServer.dataset}")
