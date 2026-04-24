@@ -4,6 +4,7 @@ from rest_framework.decorators import action, api_view
 from rest_framework.response import Response
 
 from django.db.models import Exists, F, Max, OuterRef, Q, Subquery
+from django.utils import timezone
 
 from .exchange import chf_to_eur, chf_to_usd, usd_to_chf
 from .models import Alert, Game, Genre, Listing, Machine, Price
@@ -259,13 +260,21 @@ def opportunities(request):
     chf_eur = get_rate("CHF", "EUR") or 1.09
     usd_eur = get_rate("USD", "EUR") or 0.86
 
-    # 1. Récupérer les listings (1 query)
+    # 1. Récupérer les listings actifs (1 query)
+    # Exclure les listings expirés (ends_at dépassé) et ceux scrapés il y a
+    # plus de 14 jours (probablement expirés, pas re-vus dans les scrapes).
+    from datetime import timedelta
+    from django.db.models import Q
+    now = timezone.now()
+    cutoff = now - timedelta(days=14)
     qs = (
         Listing.objects.filter(
             source__in=["ricardo", "ebay"],
             game__isnull=False,
             current_price__gte=5,
+            scraped_at__gte=cutoff,
         )
+        .filter(Q(ends_at__isnull=True) | Q(ends_at__gt=now))
         .select_related("game")
         .prefetch_related("game__machines")
     )

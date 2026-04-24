@@ -105,8 +105,31 @@ def _title_from_slug(href: str) -> str:
     return title
 
 
+ENDED_MARKERS = (
+    "vendu",        # vendue/vendus aussi
+    "terminé", "termine",
+    "clôturé", "cloture",
+    "sold",
+    "ended",
+    "fermé", "ferme",
+)
+
+
+def _is_ended_card(text: str) -> bool:
+    """True si le texte de la carte indique que l'annonce est terminée."""
+    low = text.lower()
+    # Chercher les marqueurs comme mots isolés ou en début de ligne
+    for m in ENDED_MARKERS:
+        if re.search(rf"\b{m}\b", low):
+            return True
+    return False
+
+
 def _extract_listing_from_card(link_el) -> dict | None:
-    """Extrait une annonce depuis son élément <a> de la liste de résultats."""
+    """Extrait une annonce depuis son élément <a> de la liste de résultats.
+
+    Retourne None si l'annonce est déjà terminée (badge "Vendu" / "Terminé").
+    """
     href = link_el.get("href", "")
     if not href or "/fr/a/" not in href:
         return None
@@ -115,6 +138,11 @@ def _extract_listing_from_card(link_el) -> dict | None:
     listing_url = href.split("?")[0]
     if listing_url.startswith("/"):
         listing_url = f"https://www.ricardo.ch{listing_url}"
+
+    # Vérifier si l'annonce est terminée (texte de la carte entière)
+    card_text = link_el.get_text(" ", strip=True)
+    if _is_ended_card(card_text):
+        return None
 
     # Titre : source unique = slug URL (déterministe, les alt img sont des badges)
     title = _title_from_slug(href)
