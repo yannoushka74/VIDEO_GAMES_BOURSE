@@ -221,6 +221,8 @@ ACCESSORY_TOKENS_STRONG = {
     "repro", "reproduction", "shells",
     "imprimante", "3d print", "printed",
     "figurine",
+    # "figur" seul (allemand pour figurine, pas dans un titre de jeu)
+    "figur",
     # Goodies / non-jeux (single token)
     "phonecard", "poster", "affiche", "badge",
     "coque", "etui",
@@ -366,6 +368,28 @@ ACCESSORY_PHRASES = (
     "not for resale",
     # Étuis / fourreaux
     "fourreau",
+    # Rééditions / repros modernes (pas des cartouches officielles d'époque)
+    "strictly limited",
+    "limited run games",
+    "limited run game",
+    "lrg games",
+    "premium edition games",
+    "super rare games",
+    "forever physical",
+    "retro-bit",
+    "retrobit",
+    "piko interactive",
+    "evercade",
+    "fan made",
+    "fan-made",
+    "homebrew",
+    "rom hack",
+    "romhack",
+    "aftermarket",
+    "modern reprint",
+    "reedition",
+    "rééédition",
+    "ré-édition",
 )
 
 # Phrases indiquant une console DIFFÉRENTE des cibles (PS, Xbox, Wii, etc.)
@@ -408,6 +432,10 @@ ALIEN_PER_PLATFORM = {
         "neo4all",  # emulateur Dreamcast
         "playstation", "ps2", "ps1", "psx", "sony",
         "imprimante 3d", "3d print",
+        # MVS = arcade, les cotes AES (console) sont 10x plus chères
+        " mvs", "neo geo mvs", "neogeo mvs", "neo-geo mvs",
+        "mv-", "mv1", "mv2", "mv4", "mv6",  # MVS board refs
+        "arcade pcb", "pcb board", "jamma",
     ),
     "nes": (
         "gameboy", "game boy", "gba", "gbc",
@@ -756,6 +784,15 @@ def _score_pair(listing_clean: str, listing_nums: set[int],
     overlap = _token_overlap(listing_tokens, game_tokens)
     if overlap < 1.0:
         return 0
+
+    # Jeux avec très peu de tokens (1-2) : exiger une précision élevée
+    # pour éviter "Invader" (1 token) matchant "Space Invaders" (2 tokens listing)
+    # Le listing a des mots significatifs en plus → ce n'est pas le bon jeu
+    if len(game_tokens) <= 2:
+        non_noise = [t for t in listing_tokens if t not in game_tokens]
+        # Si le listing a plus de tokens significatifs que le jeu lui-même, rejeter
+        if len(non_noise) > len(game_tokens):
+            return 0
 
     # Score basé sur la proportion de tokens du listing qui viennent du jeu
     # Un game_tokens > listing_tokens signifie qu'on a supprimé du bruit
