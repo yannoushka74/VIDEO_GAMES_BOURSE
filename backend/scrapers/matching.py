@@ -455,6 +455,8 @@ ALIEN_PER_PLATFORM = {
     "nes": (
         "gameboy", "game boy", "gba", "gbc",
         " switch", "nintendo switch", "nes edition",
+        # SNES est alien pour NES (titres tels que "Super Nintendo NES Jimmy Connors")
+        "super nintendo", "super nes", " snes ", "supernintendo",
     ),
     "snes": (
         "gameboy", "game boy", "gba", "gbc",
