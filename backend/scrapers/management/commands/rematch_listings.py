@@ -91,7 +91,7 @@ class Command(BaseCommand):
             if old_game_id:
                 before_matched += 1
 
-            if is_likely_accessory(listing.title):
+            if is_likely_accessory(listing.title, listing.description or ""):
                 accessories += 1
                 # Forcer game=NULL pour les accessoires
                 if old_game_id is not None:

@@ -178,6 +178,56 @@ def search_ebay(game_title: str, platform_slug: str = "", limit: int = 20, pal_o
         return []
 
 
+def fetch_ebay_description(item_id: str) -> str:
+    """Fetch la description complète d'un item via eBay Browse API getItem.
+
+    item_id est de la forme "v1|123456789|0" (legacy) ou un item ID propre.
+    Si le listing_url ne contient que le numéro, on construit l'item_id v1|...|0.
+    """
+    token = _get_oauth_token()
+    if not token:
+        return ""
+    if "|" not in item_id:
+        item_id = f"v1|{item_id}|0"
+    try:
+        resp = requests.get(
+            f"{BROWSE_URL}/item/{item_id}",
+            headers={
+                "Authorization": f"Bearer {token}",
+                "X-EBAY-C-MARKETPLACE-ID": "EBAY_FR",
+            },
+            timeout=15,
+        )
+        if resp.status_code != 200:
+            logger.warning("eBay getItem %s: %s", item_id, resp.status_code)
+            return ""
+        data = resp.json()
+        # Prendre shortDescription en priorité (plus propre), sinon description (HTML)
+        short = data.get("shortDescription", "") or ""
+        desc = data.get("description", "") or ""
+        # Strip HTML tags pour rester propre
+        if desc:
+            desc = re.sub(r"<[^>]+>", " ", desc)
+            desc = re.sub(r"\s+", " ", desc).strip()
+        if short and desc:
+            return f"{short}\n{desc}"[:5000]
+        return (short or desc)[:5000]
+    except Exception as e:
+        logger.warning("Erreur eBay getItem %s: %s", item_id, e)
+        return ""
+
+
+def extract_ebay_item_id(listing_url: str) -> str:
+    """Extrait l'item_id depuis l'URL eBay.
+
+    URLs typiques :
+    - https://www.ebay.fr/itm/137202494174?...
+    - https://www.ebay.fr/itm/Some-Title/137202494174?...
+    """
+    m = re.search(r"/itm/(?:[^/]+/)?(\d{9,15})", listing_url)
+    return m.group(1) if m else ""
+
+
 class EbayScraper:
     """Scraper eBay API — pas de navigateur, API REST directe."""
 

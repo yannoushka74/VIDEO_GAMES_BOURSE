@@ -366,6 +366,68 @@ def scrape_ricardo_all_parallel(platforms: list[str], parallel: int = 4):
     return results_by_platform
 
 
+# --- Fetch description depuis page détail (lazy / on-demand) ---
+
+
+def _extract_description_from_detail(html: str) -> str:
+    """Extrait la description textuelle d'une page détail Ricardo.
+
+    Ricardo est un SPA Vue/JS — la description est rendue dans le DOM
+    après hydration. On cherche tout bloc de texte significatif.
+    """
+    soup = soupify(html)
+    # Stratégie 1 : meta description
+    m = soup.find("meta", attrs={"property": "og:description"})
+    if m and m.get("content"):
+        return m.get("content").strip()
+    m = soup.find("meta", attrs={"name": "description"})
+    if m and m.get("content"):
+        return m.get("content").strip()
+    # Stratégie 2 : section avec data-attribute description
+    for sel in (
+        "[data-testid*='description']",
+        "[data-test*='description']",
+        ".description",
+        "section[aria-label*='escription']",
+        "div[aria-label*='escription']",
+    ):
+        el = soup.select_one(sel)
+        if el:
+            txt = el.get_text(" ", strip=True)
+            if len(txt) > 30:
+                return txt
+    # Stratégie 3 : main / article
+    main = soup.find("main") or soup.find("article")
+    if main:
+        # Filtrer les éléments structurels (header, nav, footer, button)
+        for bad in main.find_all(["header", "nav", "footer", "button", "script", "style"]):
+            bad.decompose()
+        txt = main.get_text(" ", strip=True)
+        return txt[:5000]
+    return ""
+
+
+@browser(headless=True, reuse_driver=True, close_on_crash=True, output=None)
+def fetch_ricardo_descriptions(driver: Driver, listing_urls: list[str]) -> dict[str, str]:
+    """Fetch les descriptions de plusieurs listings Ricardo.
+
+    Renvoie un dict {url: description}. Les listings échoués ont une str vide.
+    """
+    out: dict[str, str] = {}
+    for i, url in enumerate(listing_urls, 1):
+        try:
+            driver.google_get(url)
+            driver.short_random_sleep()
+            driver.sleep(4)
+            desc = _extract_description_from_detail(driver.page_html)
+            out[url] = desc
+            logger.info("Ricardo desc %d/%d: %s chars (%s)", i, len(listing_urls), len(desc), url)
+        except Exception as e:
+            logger.warning("Ricardo desc fail (%s): %s", url, e)
+            out[url] = ""
+    return out
+
+
 # --- Recherche ciblée par titre de jeu ---
 
 # Mots-clés console à ajouter à la query pour cibler la bonne plateforme

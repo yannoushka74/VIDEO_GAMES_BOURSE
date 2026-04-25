@@ -164,6 +164,10 @@ class Listing(models.Model):
     condition = models.CharField(max_length=100, blank=True)
     region = models.CharField(max_length=10, blank=True, help_text="PAL, NTSC, JP")
 
+    # Description complète (fetchée à la demande sur la page détail)
+    description = models.TextField(blank=True, default="")
+    description_fetched_at = models.DateTimeField(null=True, blank=True)
+
     scraped_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

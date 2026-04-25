@@ -295,7 +295,7 @@ def opportunities(request):
     raw_listings = list(qs)
     listings = []
     for l in raw_listings:
-        if is_likely_accessory(l.title):
+        if is_likely_accessory(l.title, l.description or ""):
             continue
         if is_alien_platform_listing(l.title, l.platform_slug):
             continue

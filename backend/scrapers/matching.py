@@ -681,14 +681,35 @@ def clean_tokens(normalized_text: str) -> list[str]:
     return expanded
 
 
-def is_likely_accessory(title: str) -> bool:
-    """True si le listing semble être un accessoire / bundle / console seule.
+DESCRIPTION_REPRO_MARKERS = (
+    "reproduction", "repro cartridge", "repro cart", "this is a repro",
+    "reprint", "modern reprint", "new reprint",
+    "strictly limited", "limited run games", "premium edition games",
+    "super rare games", "retro-bit", "retrobit", "piko interactive",
+    "evercade", "fan made", "fan-made", "homebrew", "rom hack",
+    "romhack", "aftermarket cartridge", "non officiel", "non-officiel",
+    "n est pas officiel", "n est pas une cartouche officiel",
+    "pas de logo nintendo", "pas de logo super nintendo",
+    "boite reimprime", "réimprimé", "reimprime",
+    "retro reedition", "reedition moderne",
+)
+
+
+def is_likely_accessory(title: str, description: str = "") -> bool:
+    """True si le listing semble être un accessoire / bundle / console seule / repro.
 
     Cas détectés :
     - Phrases bundle ("konsole mit", "spiele sammlung", "lot de jeux"...)
     - Le titre ne contient AUCUN mot autre que des accessoires + noise console
     - Plus de 50% des tokens utiles sont des termes accessoires
+    - Si `description` fournie : marqueurs explicites de repro / reprint
     """
+    # Description : marqueurs explicites de repro/reprint (priorité haute)
+    if description:
+        desc_norm = normalize(description)
+        if any(m in desc_norm for m in DESCRIPTION_REPRO_MARKERS):
+            return True
+
     norm = normalize(title)
     if not norm:
         return True
