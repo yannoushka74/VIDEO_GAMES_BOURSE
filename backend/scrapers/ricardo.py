@@ -408,23 +408,32 @@ def _extract_description_from_detail(html: str) -> str:
 
 
 @browser(headless=True, reuse_driver=True, close_on_crash=True, output=None)
-def fetch_ricardo_descriptions(driver: Driver, listing_urls: list[str]) -> dict[str, str]:
-    """Fetch les descriptions de plusieurs listings Ricardo.
+def _fetch_one_ricardo_description(driver: Driver, url: str) -> dict:
+    """Fetch la description d'UN listing Ricardo (signature attendue par @browser)."""
+    try:
+        driver.google_get(url)
+        driver.short_random_sleep()
+        driver.sleep(4)
+        desc = _extract_description_from_detail(driver.page_html)
+        logger.info("Ricardo desc: %s chars (%s)", len(desc), url)
+        return {"url": url, "description": desc}
+    except Exception as e:
+        logger.warning("Ricardo desc fail (%s): %s", url, e)
+        return {"url": url, "description": ""}
 
-    Renvoie un dict {url: description}. Les listings échoués ont une str vide.
+
+def fetch_ricardo_descriptions(listing_urls: list[str]) -> dict[str, str]:
+    """Fetch descriptions pour N listings Ricardo. Retourne dict {url: desc}.
+
+    Botasaurus itère automatiquement la liste passée à la fonction décorée.
     """
+    if not listing_urls:
+        return {}
+    results = _fetch_one_ricardo_description(listing_urls)
     out: dict[str, str] = {}
-    for i, url in enumerate(listing_urls, 1):
-        try:
-            driver.google_get(url)
-            driver.short_random_sleep()
-            driver.sleep(4)
-            desc = _extract_description_from_detail(driver.page_html)
-            out[url] = desc
-            logger.info("Ricardo desc %d/%d: %s chars (%s)", i, len(listing_urls), len(desc), url)
-        except Exception as e:
-            logger.warning("Ricardo desc fail (%s): %s", url, e)
-            out[url] = ""
+    for r in results or []:
+        if r and isinstance(r, dict):
+            out[r.get("url", "")] = r.get("description", "")
     return out
 
 
