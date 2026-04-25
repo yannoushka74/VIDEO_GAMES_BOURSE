@@ -217,8 +217,10 @@ ACCESSORY_TOKENS_STRONG = {
     "magazin", "magazine", "zeitschrift",
     # Generic accessoire
     "zubehoer", "zubehör", "accessoire", "accessoires", "accessory",
-    # Cartouches vides / repro
+    # Cartouches vides / repro / non-jeux
     "repro", "reproduction", "shells",
+    "imprimante", "3d print", "printed",
+    "figurine",  # déjà dans STRONG mais aussi en phrase pour sécurité
 }
 
 # Tokens "FAIBLES" : isolés, ils ne suffisent pas (peuvent apparaître dans des titres).
@@ -376,9 +378,22 @@ ACCEPTED_PLATFORM_PHRASES = {
     "n64": ("n64", "nintendo 64"),
     "gba": ("gba", "game boy advance", "gameboy advance"),
     "saturn": ("saturn", "sega saturn"),
-    "neo": ("neo geo", "neogeo", "neo-geo"),
+    "neo": ("neo geo aes", "neogeo aes"),  # PAS "neo geo" seul (trop large, matche Pocket/CD/Dreamcast)
     "ps1": ("ps1", "psx", "playstation 1", "ps one", "psone"),
     "dreamcast": ("dreamcast", "sega dreamcast"),
+}
+
+# Phrases alien SPÉCIFIQUES par console cible (en plus de ALIEN_PLATFORM_PHRASES)
+# Permet de filtrer les sous-variantes (Neo Geo Pocket vs AES, etc.)
+ALIEN_PER_PLATFORM = {
+    "neo": (
+        "dreamcast", "sega dreamcast",
+        "neo geo pocket", "neogeo pocket", "neo-geo pocket", "ngpc",
+        "neo geo cd", "neogeo cd", "neo-geo cd", "neo geo cdz", "neogeo cdz",
+        "neo4all",  # emulateur Dreamcast
+        "playstation", "ps2", "ps1", "psx",
+        "imprimante 3d", "3d print",
+    ),
 }
 
 
@@ -387,10 +402,19 @@ def is_alien_platform_listing(title: str, target_platform: str) -> bool:
 
     Permet de rejeter "ps2", "xbox", "wii" dans une recherche ciblée sur snes.
     Tolère les listings qui mentionnent AUSSI la console cible.
+
+    Pour Neo Geo, rejette spécifiquement Pocket, CD, Dreamcast, PS2
+    car "neo geo" dans le titre matche toutes les variantes.
     """
-    norm = " " + normalize(title) + " "  # padding pour les patterns avec espaces
+    norm = " " + normalize(title) + " "
+
+    # D'abord vérifier les aliens spécifiques à cette console
+    platform_aliens = ALIEN_PER_PLATFORM.get(target_platform, ())
+    if platform_aliens and any(p in norm for p in platform_aliens):
+        return True
+
     accepted = ACCEPTED_PLATFORM_PHRASES.get(target_platform, ())
-    # Si la console cible est mentionnée, on accepte sans regarder les alien
+    # Si la console cible est mentionnée, on accepte sans regarder les alien génériques
     if any(p in norm for p in accepted):
         return False
     # Sinon, si une console étrangère est mentionnée, c'est un alien

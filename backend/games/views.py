@@ -283,7 +283,17 @@ def opportunities(request):
     if platform:
         qs = qs.filter(platform_slug=platform)
 
-    listings = list(qs)
+    from scrapers.matching import is_alien_platform_listing, is_likely_accessory
+
+    # Filtrer les listings aliens/accessoires avant le traitement lourd
+    raw_listings = list(qs)
+    listings = []
+    for l in raw_listings:
+        if is_likely_accessory(l.title):
+            continue
+        if is_alien_platform_listing(l.title, l.platform_slug):
+            continue
+        listings.append(l)
     game_ids = {l.game_id for l in listings}
 
     # Mapping console → substring attendu dans product_url PriceCharting
