@@ -220,7 +220,13 @@ ACCESSORY_TOKENS_STRONG = {
     # Cartouches vides / repro / non-jeux
     "repro", "reproduction", "shells",
     "imprimante", "3d print", "printed",
-    "figurine",  # déjà dans STRONG mais aussi en phrase pour sécurité
+    "figurine",
+    # Coques / protections / accessoires cosmétiques
+    "snap lock", "coque",
+    "phonecard", "phone card", "carte telephonique",
+    "poster", "affiche",
+    "porte cle", "porte-cle", "keychain",
+    "pin badge", "badge",
 }
 
 # Tokens "FAIBLES" : isolés, ils ne suffisent pas (peuvent apparaître dans des titres).
