@@ -364,6 +364,8 @@ ACCESSORY_PHRASES = (
     " demo disc",
     " demo disk",
     "not for resale",
+    # Étuis / fourreaux
+    "fourreau",
 )
 
 # Phrases indiquant une console DIFFÉRENTE des cibles (PS, Xbox, Wii, etc.)
@@ -404,8 +406,23 @@ ALIEN_PER_PLATFORM = {
         "neo geo pocket", "neogeo pocket", "neo-geo pocket", "ngpc",
         "neo geo cd", "neogeo cd", "neo-geo cd", "neo geo cdz", "neogeo cdz",
         "neo4all",  # emulateur Dreamcast
-        "playstation", "ps2", "ps1", "psx",
+        "playstation", "ps2", "ps1", "psx", "sony",
         "imprimante 3d", "3d print",
+    ),
+    "nes": (
+        "gameboy", "game boy", "gba", "gbc",
+        " switch", "nintendo switch", "nes edition",
+    ),
+    "snes": (
+        "gameboy", "game boy", "gba", "gbc",
+        " switch", "nintendo switch",
+    ),
+    "n64": (
+        "gameboy", "game boy", "gba", "gbc",
+        " switch", "nintendo switch",
+    ),
+    "gba": (
+        "gba micro",  # hardware, pas un jeu
     ),
 }
 

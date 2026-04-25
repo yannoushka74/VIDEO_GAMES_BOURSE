@@ -284,14 +284,23 @@ def opportunities(request):
         qs = qs.filter(platform_slug=platform)
 
     from scrapers.matching import is_alien_platform_listing, is_likely_accessory
+    import re
 
-    # Filtrer les listings aliens/accessoires avant le traitement lourd
+    # Regex pour détecter les titres japonais (dans le titre du listing)
+    JP_TITLE_RE = re.compile(
+        r"\b(japonais|japonnais|japanese|japon|japan|jp\b|jap\b|ntsc.?j)", re.IGNORECASE
+    )
+
+    # Filtrer les listings aliens/accessoires/JP avant le traitement lourd
     raw_listings = list(qs)
     listings = []
     for l in raw_listings:
         if is_likely_accessory(l.title):
             continue
         if is_alien_platform_listing(l.title, l.platform_slug):
+            continue
+        # Exclure les listings dont le titre mentionne explicitement JP
+        if JP_TITLE_RE.search(l.title):
             continue
         listings.append(l)
     game_ids = {l.game_id for l in listings}
