@@ -54,6 +54,18 @@ spec:
           value: "*"
         - name: DJANGO_SECRET_KEY
           value: "k8s-prod-secret-change-me-later"
+        - name: EBAY_APP_ID
+          valueFrom:
+            secretKeyRef:
+              name: ebay-api
+              key: EBAY_APP_ID
+              optional: true
+        - name: EBAY_CERT_ID
+          valueFrom:
+            secretKeyRef:
+              name: ebay-api
+              key: EBAY_CERT_ID
+              optional: true
         ports:
         - containerPort: 8000
         resources:
