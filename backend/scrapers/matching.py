@@ -390,6 +390,16 @@ ACCESSORY_PHRASES = (
     "reedition",
     "rééédition",
     "ré-édition",
+    # Produits réimprimés connus
+    "turrican anthology",
+    "turrican director",
+    "turrican directors",
+    "turrican 2 se ",
+    "turrican 2 special",
+    "super turrican 2 se",
+    "super turrican 2 special",
+    "turrican collection",
+    " 30th anniversary",
 )
 
 # Phrases indiquant une console DIFFÉRENTE des cibles (PS, Xbox, Wii, etc.)
@@ -692,6 +702,27 @@ def is_likely_accessory(title: str) -> bool:
     for phrase in ACCESSORY_PHRASES:
         if phrase in norm:
             return True
+
+    # Combo "Special Edition" / "Anniversary" + sealed sur jeu retro = repro moderne
+    # Strictly Limited Games, Limited Run Games, etc. vendent des reprints
+    # de jeux 1990s comme "Super Turrican 2 SE NEUF SOUS BLISTER".
+    # Les vraies cartouches Nintendo officielles d'époque ne sont pratiquement
+    # jamais factory-sealed 30 ans après.
+    REPRO_EDITION_MARKERS = (
+        "special edition", "anniversary edition", "30th anniversary",
+        "25th anniversary", "anniversary collection", "directors cut",
+        "director s cut", "collectors edition", "collector edition",
+        "limited collector",
+    )
+    SEALED_MARKERS = (
+        "sealed", "scelle", "factory sealed", "neuf sous blister",
+        "neu ohne folie", "neuware", "sous blister", "still sealed",
+        "blister",
+    )
+    has_edition = any(m in norm for m in REPRO_EDITION_MARKERS)
+    has_sealed = any(m in norm for m in SEALED_MARKERS)
+    if has_edition and has_sealed:
+        return True
 
     # Pattern "N games / N controllers / N spiele"
     if BUNDLE_QUANTITY_RE.search(norm):
