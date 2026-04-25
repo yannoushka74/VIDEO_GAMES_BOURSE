@@ -682,16 +682,25 @@ def clean_tokens(normalized_text: str) -> list[str]:
 
 
 DESCRIPTION_REPRO_MARKERS = (
+    # Repro / reprint explicites
     "reproduction", "repro cartridge", "repro cart", "this is a repro",
-    "reprint", "modern reprint", "new reprint",
-    "strictly limited", "limited run games", "premium edition games",
-    "super rare games", "retro-bit", "retrobit", "piko interactive",
-    "evercade", "fan made", "fan-made", "homebrew", "rom hack",
-    "romhack", "aftermarket cartridge", "non officiel", "non-officiel",
+    "is a reproduction", "modern reprint", "new reprint",
+    # Marques de repro modernes (forme courte = match plus large)
+    "strictly limited",
+    "limited run",  # marque de reprint (Limited Run Games)
+    "premium edition games", "super rare games", "forever physical",
+    "retro-bit", "retrobit", "piko interactive", "evercade",
+    # Fan / homebrew
+    "fan made", "fan-made", "homebrew", "rom hack", "romhack",
+    "aftermarket cartridge",
+    # Mention française explicite
+    "non officiel", "non-officiel",
     "n est pas officiel", "n est pas une cartouche officiel",
     "pas de logo nintendo", "pas de logo super nintendo",
-    "boite reimprime", "réimprimé", "reimprime",
-    "retro reedition", "reedition moderne",
+    "cartouche reimprime", "boite reimprime", "réimprimé", "reimprime",
+    "retro reedition", "reedition moderne", "ré édition",
+    # Édition limitée + sealed dans description
+    "edition limitee neuve", "limited edition sealed",
 )
 
 
