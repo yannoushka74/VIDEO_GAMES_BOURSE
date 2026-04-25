@@ -221,12 +221,10 @@ ACCESSORY_TOKENS_STRONG = {
     "repro", "reproduction", "shells",
     "imprimante", "3d print", "printed",
     "figurine",
-    # Coques / protections / accessoires cosmétiques
-    "snap lock", "coque",
-    "phonecard", "phone card", "carte telephonique",
-    "poster", "affiche",
-    "porte cle", "porte-cle", "keychain",
-    "pin badge", "badge",
+    # Goodies / non-jeux (single token)
+    "phonecard", "poster", "affiche", "badge",
+    "coque", "etui",
+    "statue",
 }
 
 # Tokens "FAIBLES" : isolés, ils ne suffisent pas (peuvent apparaître dans des titres).
@@ -334,6 +332,15 @@ ACCESSORY_PHRASES = (
     "block stack up",
     "rob stack",
     "rob gyromite",
+    # Goodies / accessoires cosmétiques / non-jeux
+    "snap lock",
+    "phone card",
+    "carte telephonique",
+    "porte cle",
+    "pin badge",
+    "beast kingdom",     # figurines/statues
+    "figur statue",
+    "figurine statue",
     # Covers / boîtiers de remplacement (pas le jeu)
     "cover and case",
     "case replacement",
