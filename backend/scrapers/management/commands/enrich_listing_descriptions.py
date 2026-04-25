@@ -1,7 +1,11 @@
 """Enrichit les Listings avec leur description complète.
 
+Pour eBay : fetch via Browse API getItem (rapide, fiable).
 Pour Ricardo : fetch via Botasaurus (page détail JS-rendered).
-Pour eBay : fetch via Browse API getItem.
+    ⚠️ Cloudflare bloque la plupart des navigations directes vers les
+    pages de détail Ricardo : très peu de descriptions seront effectivement
+    récupérées. La détection de CAPTCHA est gérée → ces listings restent
+    avec description vide.
 
 Usage :
     python manage.py enrich_listing_descriptions --source ricardo --limit 100

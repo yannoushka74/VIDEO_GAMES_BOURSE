@@ -407,15 +407,28 @@ def _extract_description_from_detail(html: str) -> str:
     return ""
 
 
+CAPTCHA_MARKERS = ("captcha", "verification successful", "enable javascript and cookies")
+
+
 @browser(headless=True, reuse_driver=True, close_on_crash=True, output=None)
 def _fetch_one_ricardo_description(driver: Driver, url: str) -> dict:
-    """Fetch la description d'UN listing Ricardo (signature attendue par @browser)."""
+    """Fetch la description d'UN listing Ricardo (signature attendue par @browser).
+
+    NOTE : Cloudflare bloque la plupart des navigations directes vers les
+    pages de détail. Les pages bloquées renvoient le CAPTCHA challenge.
+    On détecte ce cas et on renvoie une description vide.
+    """
     try:
         driver.google_get(url)
         driver.short_random_sleep()
-        driver.sleep(4)
+        driver.sleep(8)  # plus long, laisse Cloudflare valider si possible
         desc = _extract_description_from_detail(driver.page_html)
-        logger.info("Ricardo desc: %s chars (%s)", len(desc), url)
+        # Détection CAPTCHA (Cloudflare) → on rejette
+        low = (desc or "").lower()
+        if any(m in low for m in CAPTCHA_MARKERS):
+            logger.warning("Ricardo CAPTCHA bloque: %s", url)
+            return {"url": url, "description": ""}
+        logger.info("Ricardo desc OK: %s chars (%s)", len(desc), url)
         return {"url": url, "description": desc}
     except Exception as e:
         logger.warning("Ricardo desc fail (%s): %s", url, e)
