@@ -58,6 +58,7 @@ class Command(BaseCommand):
         cond_changed = 0
         console_mismatch = 0
         jp_detected = 0
+        repro_detected = 0
 
         for i, listing in enumerate(qs.iterator(), 1):
             result = analyzer.analyze(
@@ -78,16 +79,24 @@ class Command(BaseCommand):
                 if not opts["dry_run"] and listing.region != "JP":
                     listing.region = "JP"
                     changed = True
+            if "repro_detected" in result["flags"]:
+                repro_detected += 1
+                # Détacher du jeu (sortir des opportunities) si repro confirmé
+                if not opts["dry_run"] and listing.game_id is not None:
+                    listing.game = None
+                    changed = True
             if changed:
-                listing.save(update_fields=["condition", "region"])
+                listing.save(update_fields=["condition", "region", "game"])
             if i % 200 == 0:
                 self.stdout.write(
-                    f"  {i}/{total} — cond:{cond_changed} console:{console_mismatch} jp:{jp_detected}"
+                    f"  {i}/{total} — cond:{cond_changed} console:{console_mismatch} "
+                    f"jp:{jp_detected} repro:{repro_detected}"
                 )
 
         self.stdout.write(
             self.style.SUCCESS(
-                f"Terminé — cond:{cond_changed} console:{console_mismatch} jp:{jp_detected} "
+                f"Terminé — cond:{cond_changed} console:{console_mismatch} "
+                f"jp:{jp_detected} repro:{repro_detected} "
                 f"{'(DRY RUN)' if opts['dry_run'] else ''}"
             )
         )

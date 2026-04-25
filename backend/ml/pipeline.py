@@ -61,24 +61,33 @@ class ListingAnalyzer:
         condition_classes: str = "ml/class_names.txt",
         console_model: str = "ml/console_model.pth",
         console_classes: str = "ml/console_class_names.txt",
+        repro_model: str = "ml/repro_model.pth",
+        repro_classes: str = "ml/repro_class_names.txt",
         condition_threshold: float = 0.7,
         console_threshold: float = 0.6,
         region_threshold: float = 0.7,
+        repro_threshold: float = 0.85,
         enable_ocr: bool = True,
+        enable_repro: bool = True,
     ):
         self.condition_threshold = condition_threshold
         self.console_threshold = console_threshold
         self.region_threshold = region_threshold
+        self.repro_threshold = repro_threshold
         self.enable_ocr = enable_ocr
+        self.enable_repro = enable_repro
 
         # Lazy load des modèles
         self._condition_clf = None
         self._console_clf = None
+        self._repro_clf = None
         self._region_clfs = {}  # par platform_slug
         self._condition_model = condition_model
         self._condition_classes = condition_classes
         self._console_model = console_model
         self._console_classes = console_classes
+        self._repro_model = repro_model
+        self._repro_classes = repro_classes
 
     def _get_condition_clf(self):
         if self._condition_clf is None:
@@ -97,6 +106,18 @@ class ListingAnalyzer:
                 self.console_threshold,
             )
         return self._console_clf
+
+    def _get_repro_clf(self):
+        if self._repro_clf is None:
+            from ml.detect_repro import ReproClassifier
+            try:
+                self._repro_clf = ReproClassifier(
+                    self._repro_model, self._repro_classes,
+                    self.repro_threshold,
+                )
+            except FileNotFoundError:
+                self._repro_clf = False  # marqueur "absent"
+        return self._repro_clf if self._repro_clf else None
 
     def _get_region_clf(self, platform_slug: str):
         """Retourne le classifieur région pour la console donnée (ou None)."""
@@ -144,6 +165,8 @@ class ListingAnalyzer:
             "console_match": True,
             "region_detected": "unknown",
             "region_confidence": 0.0,
+            "is_repro": False,
+            "repro_confidence": 0.0,
             "flags": [],
         }
 
@@ -193,6 +216,19 @@ class ListingAnalyzer:
                         result["flags"].append("region_mismatch")
             except Exception as e:
                 logger.warning("Region model failed: %s", e)
+
+        # 4. Repro detection (image-based)
+        if self.enable_repro:
+            try:
+                repro_clf = self._get_repro_clf()
+                if repro_clf:
+                    label, conf = repro_clf.predict_image(img)
+                    result["repro_confidence"] = conf
+                    if label == "repro" and conf >= self.repro_threshold:
+                        result["is_repro"] = True
+                        result["flags"].append("repro_detected")
+            except Exception as e:
+                logger.warning("Repro model failed: %s", e)
 
         # 3b. Région via OCR (fallback / JP detection)
         if self.enable_ocr and result["region_detected"] == "unknown":
