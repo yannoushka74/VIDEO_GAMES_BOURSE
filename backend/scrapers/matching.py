@@ -445,7 +445,12 @@ ALIEN_PER_PLATFORM = {
         # MVS = arcade, les cotes AES (console) sont 10x plus chères
         " mvs", "neo geo mvs", "neogeo mvs", "neo-geo mvs",
         "mv-", "mv1", "mv2", "mv4", "mv6",  # MVS board refs
-        "arcade pcb", "pcb board", "jamma",
+        "arcade pcb", "pcb board", "jamma", " arcade ",
+        # Conversions MVS→AES = pas une vraie cartouche AES officielle
+        " nci", " nci ", "(nci)", "non console insert",
+        " conversion", "aes conversion", "mvs conversion",
+        # Repros / clones
+        " repro ", "neo geo repro",
     ),
     "nes": (
         "gameboy", "game boy", "gba", "gbc",
