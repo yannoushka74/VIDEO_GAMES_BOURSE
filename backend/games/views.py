@@ -246,10 +246,13 @@ def opportunities(request):
     platform = request.query_params.get("platform", "")
     min_discount = float(request.query_params.get("min_discount", 20))
     source_filter = request.query_params.get("source", "")
+    # Filtre repro/scam : exclut les listings dont le prix est anormalement bas
+    # (typiquement des reproductions, scams ou prix mal saisis)
+    exclude_suspicious = request.query_params.get("exclude_suspicious", "true").lower() == "true"
 
     # Cache 5 min par combinaison de params
     cache_key = "opp:" + hashlib.md5(
-        f"{limit}:{platform}:{min_discount}:{source_filter}".encode()
+        f"{limit}:{platform}:{min_discount}:{source_filter}:{exclude_suspicious}".encode()
     ).hexdigest()
     cached = cache.get(cache_key)
     if cached is not None:
@@ -394,6 +397,23 @@ def opportunities(request):
         if discount_pct < min_discount:
             continue
 
+        # Détection de prix anormalement bas → repro / scam / arnaque
+        # Une cartouche officielle ne descend quasiment jamais sous 10% de la cote.
+        # Cas typiques : repro vendue 30€ alors que original = 500€.
+        suspicious = False
+        suspicious_reason = ""
+        if discount_pct >= 90 and ref_usd >= 50:
+            # Très grosse décote sur jeu coté → quasi-certain repro
+            suspicious = True
+            suspicious_reason = "price_too_low"
+        elif discount_pct >= 80 and condition in ("new", "sealed") and ref_usd >= 30:
+            # Sealed retro très bon marché = quasi-certain Strictly Limited / repro
+            suspicious = True
+            suspicious_reason = "sealed_too_cheap"
+
+        if suspicious and exclude_suspicious:
+            continue
+
         g = listing.game
         machines = [m.name for m in g.machines.all() if m.slug in RETRO_SLUGS]
 
@@ -419,6 +439,8 @@ def opportunities(request):
             "ref_region": desired_region,
             "ref_price_usd": round(ref_usd, 2),
             "discount_percent": round(discount_pct, 1),
+            "suspicious": suspicious,
+            "suspicious_reason": suspicious_reason,
         })
 
     results.sort(key=lambda r: r["discount_percent"], reverse=True)
